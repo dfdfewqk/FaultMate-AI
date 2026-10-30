@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FaultMate AI · 설비 고장 진단</title>
+<link rel="stylesheet" href="/assets/style.css"/>
+</head>
+<body>
+<div class="layout">
+  <aside class="nav">
+    <div class="brand"><div class="logo">F<span>•</span></div><div><b>FaultMate AI</b><small>Maintenance Copilot</small></div></div>
+    <div class="nav-caption">워크스페이스</div>
+    <a class="nav-link selected" href="#diagnostic-panel">◇　고장 진단</a>
+    <a class="nav-link" href="#knowledge-panel">▣　근거 자료실</a>
+    <a class="nav-link" href="#integration-panel">⚙　고급 분석</a>
+    <div class="nav-footer">안전한 외부 관찰과 기존 기록을 이용하세요.<br/>현장 작업 승인·고장 확정을 대신하지 않습니다.</div>
+  </aside>
+  <main>
+    <div class="topline"><span class="status" id="status" role="status">서버 연결 확인 중</span></div>
+    <h1>설비 고장 진단</h1>
+    <p class="subhead">설비와 관찰한 증상을 입력해 관련 사례를 찾은 다음, 작업자가 선택한 사례의 원인 후보와 확인 항목을 검토합니다. <b>실제 원인을 확정하거나 작업을 승인하지 않습니다.</b></p>
+    <section class="panel" id="diagnostic-panel">
+      <div class="sectionhead"><div><h2>증상 입력</h2></div></div>
+      <p class="small-note">기본 진단은 로컬에서 처리되며 외부 AI로 전송되지 않습니다. 안전한 외부 관찰과 기존 기록만 사용하세요.</p>
+      <div class="demo-tools"><button type="button" id="triage-demo" class="secondary-button">예시 입력 불러오기</button><span id="demo-banner" class="demo-banner" hidden>가상 데이터 예시 · 실제 점검 결과가 아닙니다</span></div>
+      <form id="triage-form" class="triage-form">
+        <div class="hazard-row" id="hazard-gate"><div><b>먼저, 긴급 위험 징후 확인</b><p>화재·연기·감전 우려·사람 끼임 등 긴급 상황이 있나요? 위험한 곳에 접근해 확인하지 마세요.</p></div><select id="triage-hazard" aria-label="긴급 위험 징후"><option value="unknown">아직 확인되지 않음</option><option value="yes">긴급 위험 있음 — 분석 중단</option><option value="no">관찰된 긴급 위험 징후 없음 (안전 인증 아님)</option></select></div>
+        <p id="hazard-status" class="hazard-status is-unknown" role="status" aria-live="polite" aria-atomic="true">안전 상태 미확인 · 원인 후보는 정보 검토용으로만 볼 수 있습니다. 실제 점검·정비 전 현장 안전 절차가 별도로 필요합니다.</p>
+        <div><label for="triage-equipment">1. 설비 종류</label><select id="triage-equipment" required><option value="">설비 선택</option><option value="컨베이어">컨베이어</option><option value="모터">모터</option><option value="센서">센서</option></select></div>
+        <div><label for="triage-symptom">2. 관찰한 증상</label>
+          <textarea id="triage-symptom" rows="3" maxlength="500" placeholder="예: 모터에서 소리는 나지만 벨트가 움직이지 않음"></textarea>
+          <p class="small-note">키워드 일치로 기존 교육용 사례를 찾습니다. 부정문·원인·설비 적합성은 자동 판단하지 않습니다.</p>
+        </div>
+        <div class="case-suggest" id="triage-suggestions" aria-live="polite" aria-label="관련 사례 추천">
+          <strong>관련 사례 추천</strong>
+          <div id="triage-suggestion-list" class="suggestion-list"><p class="small-note">설비 종류와 증상을 입력하면 관련 사례를 보여줍니다.</p></div>
+        </div>
+        <div><label for="triage-case">3. 검토할 사례 직접 선택</label><select id="triage-case" required><option value="">사례 선택</option></select>
+          <p class="small-note">추천이 맞지 않으면 억지로 선택하지 마세요. 기존 사례 목록에서도 직접 선택할 수 있습니다.</p>
+        </div>
+
+        <details class="optional-fields" id="triage-more"><summary>모델명·알람 기록 입력 (선택)</summary>
+          <p class="small-note">모델명과 알람 기록은 결과에 참고용으로 남지만 현재 사례 추천이나 원인 후보 순위를 자동으로 바꾸지는 않습니다.</p>
+          <div class="form-cols">
+            <div><label for="triage-model">설비 모델명 (선택)</label><input id="triage-model" maxlength="120" placeholder="확인된 모델명만 입력" /></div>
+            <div><label for="triage-alarm">기존 알람 기록 원문 (선택)</label><input id="triage-alarm" maxlength="120" placeholder="예: 정확한 알람 문구, 미확인은 공란" /></div>
+          </div>
+        </details>
+        <div id="triage-checks" class="checks-grid" aria-live="polite"><p class="small-note">추천 또는 기존 목록에서 사례를 선택하면 기록 확인 항목이 표시됩니다.</p></div>
+        <div class="form-actions"><button type="submit" id="triage-submit" disabled>원인 후보 · 질문 검토</button><button type="button" id="triage-reset" class="secondary-button">입력 초기화</button></div>
+        <p class="small-note" id="triage-feedback" role="status" aria-live="polite">진단 자료 로드 중입니다.</p>
+      </form>
+      <article id="triage-result" class="triage-result" aria-live="polite">입력 후 검토 버튼을 누르면 근거 기반 후보가 표시됩니다. 실제 고장 원인으로 확정되지 않습니다.</article>
+    </section>
+    <details class="panel expand-panel" id="integration-panel"><summary class="expand-summary"><span><b>고급 분석</b><small>AI 근거 검토 · ML 데이터 · 연결 상태</small></span><span class="summary-hint">필요할 때 펼치기</span></summary>
+      <div class="integration-grid">
+        <div class="integration-item"><span>DeepSeek AI 에이전트</span><strong id="integration-agent">상태 조회 중</strong><small class="integration-technical">연결 표기: <span id="agent-status">상태 확인 중</span></small></div>
+        <div class="integration-item"><span>ML 모델 · 예측</span><strong id="integration-ml">상태 조회 중</strong></div>
+        <div class="integration-item"><span>외부 데이터 전송</span><strong id="integration-transfer">미실행</strong></div>
+      </div>
+      <p id="integration-detail" class="small-note" role="status">로컬 API에서 연결 상태를 확인하고 있습니다. 연결 전에는 규칙 기반 진단만 사용합니다.</p>
+      <div id="agent-controls" class="integration-extra">
+        <h3>AI 근거 검토 (선택 기능)</h3>
+        <p class="small-note">선택된 사례·관찰과 공개 근거만 전송합니다. 입력한 원문 증상·알람·모델명은 전송하지 않습니다. 전송 전 내용을 확인하고 매 요청마다 동의해야 합니다.</p>
+        <div class="form-actions"><button type="button" class="secondary-button" id="agent-preview">AI 전송 예정 자료 확인</button></div>
+        <pre id="agent-preview-content" class="data-preview" hidden></pre>
+        <label class="consent-line"><input type="checkbox" id="agent-consent"/> 이 요청의 공개 사례·관찰 정보가 DeepSeek 서버로 전송되는 데 동의합니다.</label>
+        <div class="form-actions"><button type="button" id="agent-run" disabled>AI 근거 검토 실행</button></div>
+        <p id="agent-feedback" class="small-note" role="status">AI 사용은 선택 사항이며 로컬 진단은 항상 별도로 작동합니다.</p>
+        <article id="agent-result" class="triage-result" aria-live="polite"></article>
+      </div>
+      <div id="ml-controls" class="integration-extra">
+        <h3>베어링 측정 데이터 ML (선택 기능)</h3>
+        <p class="small-note">기존 학습과 동일한 진동·전류 특성 CSV만 사용합니다. 검증 모델이 없으면 결과를 생성하지 않습니다. 데이터는 로컬 서버에서만 처리합니다.</p>
+        <label for="ml-upload">측정 특성 CSV</label>
+        <input type="file" id="ml-upload" accept=".csv,text/csv"/>
+        <div class="form-actions"><button type="button" id="ml-run">CSV 검증·ML 실행</button></div>
+        <p id="ml-feedback" class="small-note" role="status"></p>
+        <article id="ml-result" class="triage-result" aria-live="polite"></article>
+      </div>
+    </details>
+    <details class="panel expand-panel" id="knowledge-panel"><summary class="expand-summary"><span><b>근거 자료실</b><small>설비별 고장 사례 7개 · 제조사 출처</small></span><span class="summary-hint">필요할 때 펼치기</span></summary>
+      <div class="caution">매뉴얼의 적용 모델은 다를 수 있습니다. 안전 인터록 우회·무단 재가동·내부 접촉 점검을 지시하지 않습니다.</div>
+      <div class="knowledge-grid">
+        <div><label for="equipment-filter">분야</label><select id="equipment-filter"><option value="">전체</option><option value="컨베이어">컨베이어</option><option value="모터">모터</option><option value="센서">센서</option></select><div id="knowledge-list" class="knowledge-list" aria-live="polite">자료실을 펼치면 사례를 불러옵니다.</div></div>
+        <article class="knowledge-detail" id="knowledge-detail" aria-live="polite">사례를 선택하면 근거 자료가 표시됩니다.</article>
+      </div>
+    </details>
+    <footer>FaultMate AI · 교육·검토용 원인 후보이며 작업자 안전 절차와 현장 판단을 대체하지 않습니다.</footer>
+  </main>
+</div>
+<script src="/assets/app.js" defer></script>
+</body></html>

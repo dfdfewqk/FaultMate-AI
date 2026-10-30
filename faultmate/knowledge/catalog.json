@@ -1,0 +1,584 @@
+{
+  "schema_version": "1.0.0",
+  "project": "FaultMate AI",
+  "stage": "P1",
+  "catalog_kind": "reference_casebook_not_diagnosis",
+  "sources": [
+    {
+      "id": "OSHA-LOTO",
+      "title": "OSHA 29 CFR 1910.147 – Control of Hazardous Energy",
+      "organization": "OSHA",
+      "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.147",
+      "category": "safety_regulation_us",
+      "evidence_scope": "유지보수 중 예기치 않은 기동과 잔류 에너지에 대한 통제, 승인된 작업자·설비별 절차 필요",
+      "limit": "미국 규정. 국내 사업장의 법적 절차 및 설비별 절차 대체 불가"
+    },
+    {
+      "id": "HSE-MAINT",
+      "title": "Maintenance of work equipment",
+      "organization": "UK HSE",
+      "url": "https://www.hse.gov.uk/work-equipment-machinery/maintenance.htm",
+      "category": "safety_guidance_uk",
+      "evidence_scope": "점검·정비 전 격리·잠금, 숙련자 수행, 제조사 지침 준수",
+      "limit": "영국 지침. 국내 사업장 안전 기준 및 설비별 절차 확인 필요"
+    },
+    {
+      "id": "HSE-CONV",
+      "title": "Safe use of belt conveyors in mines",
+      "organization": "UK HSE",
+      "url": "https://www.hse.gov.uk/pubns/priced/belt-conveyors-mines.pdf",
+      "category": "conveyor_safety",
+      "evidence_scope": "컨베이어가 움직이거나 멈춰 있을 때의 정비 위험 및 격리 필요성",
+      "limit": "광산용 벨트 컨베이어 사례. 특정 생산라인 절차로 직접 적용 금지"
+    },
+    {
+      "id": "DORNER-BELT",
+      "title": "2100 Series Domestic Flat Belt Conveyor — Troubleshooting Guide",
+      "organization": "Dorner",
+      "url": "https://www.dornerconveyors.com/wp-content/uploads/2017/10/851-043j.pdf",
+      "category": "manufacturer_manual_example",
+      "evidence_scope": "벨트 미끄러짐·편주행·불연속 이송의 가능한 원인(장력, 드라이브, 오염, 걸림 등)",
+      "limit": "Dorner 2100 시리즈 전용. 타 설비는 참조 후보에 한정, 조정 명령으로 전용하지 않음"
+    },
+    {
+      "id": "INTERROLL-ROLLER",
+      "title": "24-V Roller Conveyor RM8310/8320/8330 Manual — Troubleshooting",
+      "organization": "Interroll",
+      "url": "https://www.interroll.com/fileadmin/user_upload/AMERICAS/User_Manuals/8310_8320_8330_Interroll_24-V_RollerConveyor_EN_T.Nr.1103988_V1.2.pdf",
+      "category": "manufacturer_manual_example",
+      "evidence_scope": "롤러 컨베이어 이송 불량의 후보(벨트, 구동부, 제어 보드, 연결), 전기 작업 자격",
+      "limit": "Interroll 해당 시리즈 전용. 모델 미확인 설비에 고장 코드·전압을 일반화 금지"
+    },
+    {
+      "id": "ABB-MOTOR",
+      "title": "ABB Low Voltage Ex Motor Manual — Section 9 Troubleshooting",
+      "organization": "ABB",
+      "url": "https://library.e.abb.com/public/4623ad10f91363a3c1257b1a005a607a/Ex_Motor_Manual_ML_lores.pdf",
+      "category": "manufacturer_manual_example",
+      "evidence_scope": "모터 기동 불량·소음·과부하 원인 후보(전원, 제어, 기계적 부하 등)",
+      "limit": "ABB 방폭 저압 모터 매뉴얼로 모든 모터에 적용 불가. 점검은 자격자 수행"
+    },
+    {
+      "id": "IFM-OPT",
+      "title": "OG photoelectric sensor – Installation guidelines",
+      "organization": "ifm",
+      "url": "https://www.ifm.com/us/en/us/learn-more/position/photoelectric-sensor/og/og-m18-barrel-housing/installation-guidelines",
+      "category": "manufacturer_guidance_example",
+      "evidence_scope": "광전센서 방식별 표적·반사판 정렬과 설치 조건",
+      "limit": "ifm OG 시리즈 예시. 개별 센서의 표시등·배선·정격은 실제 모델 문서 확인"
+    },
+    {
+      "id": "IFM-DIRT",
+      "title": "Photoelectric sensors – contamination and excess gain",
+      "organization": "ifm",
+      "url": "https://www.ifm.com/us/en/us/learn-more/position/photoelectric-sensor/select-by-application",
+      "category": "manufacturer_guidance_example",
+      "evidence_scope": "렌즈·반사판 오염과 센서 수광 여유의 연관성",
+      "limit": "설비의 실제 센서 오염 확인 없이 고장으로 단정 불가"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "CONV-001",
+      "equipment": "컨베이어",
+      "title": "모터에서 웅 하는 소리가 들리지만 벨트가 움직이지 않음",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "운전 명령과 보호장치 경보가 기록되어 있는지 HMI 로그에서 확인",
+          "source_ids": [
+            "ABB-MOTOR",
+            "INTERROLL-ROLLER"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "안전 거리에서 벨트·제품·구동부의 육안 이상을 관찰하고 접촉은 금지",
+          "source_ids": [
+            "HSE-CONV",
+            "HSE-MAINT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "모터·감속기·컨베이어 실제 모델, 고장 발생 시각 확인",
+          "source_ids": [
+            "ABB-MOTOR",
+            "DORNER-BELT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "기계적 걸림 또는 과부하",
+          "why_to_consider": "모터가 기동하지 못하는 경우 기계적 부하·걸림이 원인 후보가 될 수 있음",
+          "source_ids": [
+            "ABB-MOTOR",
+            "DORNER-BELT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "전원·제어 회로 관련 이상",
+          "why_to_consider": "기동 불량의 여러 후보 중 하나이며 실제 전기적 측정 없이는 확정할 수 없음",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "구동 전달계통 또는 벨트 장력 문제",
+          "why_to_consider": "구동축과 이송부 사이 손실·슬립을 설명할 수 있는 후보",
+          "source_ids": [
+            "DORNER-BELT",
+            "INTERROLL-ROLLER"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "모터가 실제로 회전하는지 아니면 소리만 나는지 확인된 기록이 있나요?",
+        "현재 알람·과부하 트립 기록은 무엇인가요?",
+        "해당 컨베이어·모터 모델명과 점검 책임자는 누구인가요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    },
+    {
+      "case_id": "CONV-002",
+      "equipment": "컨베이어",
+      "title": "모터 회전은 확인되는데 벨트 이송이 불량하거나 미끄러짐",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "기존 설비 로그의 모터 회전·이송 속도 차이를 확인",
+          "source_ids": [
+            "DORNER-BELT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "안전 구역 밖에서 이송 불량·벨트 편주행·적체 여부를 관찰",
+          "source_ids": [
+            "HSE-CONV",
+            "DORNER-BELT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "벨트 장력 또는 구동부 전달력 저하",
+          "why_to_consider": "특정 벨트 컨베이어 제조사 문서에서 슬립 원인 후보로 제시",
+          "source_ids": [
+            "DORNER-BELT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "구동 풀리 오염·마모",
+          "why_to_consider": "마찰 상태가 달라져 미끄러짐이 생길 수 있는 후보",
+          "source_ids": [
+            "DORNER-BELT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "과부하 또는 구간 걸림",
+          "why_to_consider": "일부 구간의 부하·걸림이 이송 불량과 연관될 수 있음",
+          "source_ids": [
+            "DORNER-BELT"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "실제 구동 모터·드럼 회전은 어떻게 확인했나요?",
+        "이송 불량은 계속 발생하나요, 간헐적인가요?",
+        "해당 모델 제조사의 벨트 장력·정비 지침이 있나요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    },
+    {
+      "case_id": "CONV-003",
+      "equipment": "컨베이어",
+      "title": "컨베이어가 간헐적으로 멈추거나 제품이 걸린 것으로 의심됨",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "제품 적체·걸림 알람을 로컬 로그에서 확인",
+          "source_ids": [
+            "INTERROLL-ROLLER"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "접근하지 않고 안전한 위치에서 정지 위치 및 제품 적체를 관찰",
+          "source_ids": [
+            "HSE-CONV",
+            "HSE-MAINT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "이물·제품 걸림",
+          "why_to_consider": "롤러 컨베이어의 간헐 동작·이송 이상 원인 중 하나",
+          "source_ids": [
+            "INTERROLL-ROLLER"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "벨트/구동 전달계통 이상",
+          "why_to_consider": "제조사 문서에서 불연속 이송의 후보로 제시",
+          "source_ids": [
+            "DORNER-BELT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "제어기·감지 관련 이상",
+          "why_to_consider": "실제 알람과 상태값의 확인이 필요",
+          "source_ids": [
+            "INTERROLL-ROLLER"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "제품 걸림이 육안으로 확인됐나요?",
+        "정지 직전에 나타난 알람은 무엇인가요?",
+        "보호장치·에너지 차단 승인 절차가 확보됐나요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    },
+    {
+      "case_id": "MOTOR-001",
+      "equipment": "모터",
+      "title": "구동 명령에도 모터가 기동하지 않음",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "모터·인버터·과부하 보호기 상태를 HMI 알람 기록에서 확인",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "현장에서 허용된 표지·상태 표시를 안전한 위치에서 확인",
+          "source_ids": [
+            "HSE-MAINT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "전원·제어 신호 관련 이상",
+          "why_to_consider": "전원/제어 회로 문제는 모터 기동 불량 후보로 열거됨",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "과부하 보호 동작",
+          "why_to_consider": "보호기 동작 또는 기계적 부하가 기동 불량과 관련될 수 있음",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "모터 및 구동 기계부 고장",
+          "why_to_consider": "기계적 문제 역시 후보로 언급됨",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "제어기에서 운전 명령이 실제로 기록됐나요?",
+        "과전류/과부하/인버터 경보의 원문은 무엇인가요?",
+        "모터 명판과 구동장치 모델이 확인되나요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    },
+    {
+      "case_id": "MOTOR-002",
+      "equipment": "모터",
+      "title": "모터 과부하 경보 또는 정지 반복",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "기존 시스템에서 과부하 경보 발생 시각·동작 이력을 확인",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "부하 변화·이상 음향을 접근하지 않고 기록",
+          "source_ids": [
+            "ABB-MOTOR",
+            "HSE-MAINT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "실제 부하 증가",
+          "why_to_consider": "과부하 경보와 연관될 수 있으나 정량 검증 필요",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "전압·전원 이상",
+          "why_to_consider": "기동·정격속도 문제와 전원 품질의 연관 가능성",
+          "source_ids": [
+            "ABB-MOTOR"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "기계적 마찰 또는 걸림",
+          "why_to_consider": "부하가 커지는 기계적 문제일 수 있음",
+          "source_ids": [
+            "ABB-MOTOR",
+            "DORNER-BELT"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "모터 보호장치의 경보 원문은 무엇인가요?",
+        "전류·온도·속도 기록이 확보되나요?",
+        "현재 설비가 안전하게 정지된 상태인가요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    },
+    {
+      "case_id": "SENSOR-001",
+      "equipment": "센서",
+      "title": "제품이 지나가도 광전센서가 감지하지 못함",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "PLC/HMI 기록의 감지 비트·센서 진단 이벤트를 조회",
+          "source_ids": [
+            "IFM-OPT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "안전 구역 밖에서 센서와 반사판 정렬 상태 및 오염 흔적을 관찰",
+          "source_ids": [
+            "IFM-OPT",
+            "IFM-DIRT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "센서·반사판 정렬 문제",
+          "why_to_consider": "광전 방식에서 정렬은 감지 동작에 영향을 줄 수 있음",
+          "source_ids": [
+            "IFM-OPT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "광학면 오염",
+          "why_to_consider": "오염이 수광 조건에 영향을 주는 사례가 있음",
+          "source_ids": [
+            "IFM-DIRT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "센서 방식·검출 거리 부적합",
+          "why_to_consider": "검출 방식과 설치 조건이 다르면 감지 실패 가능",
+          "source_ids": [
+            "IFM-OPT"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "투과형·회귀반사형·확산반사형 중 어떤 방식인가요?",
+        "센서 제품명 및 제조사 매뉴얼이 있나요?",
+        "센서 출력과 PLC 입력의 각 기록은 무엇인가요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    },
+    {
+      "case_id": "SENSOR-002",
+      "equipment": "센서",
+      "title": "광전센서 감지가 간헐적으로 흔들리거나 오탐지 발생",
+      "case_status": "illustrative_evidence_map",
+      "alarm_code": null,
+      "observations": [
+        {
+          "item": "PLC 입력의 상태 변경 시각 및 불량 구간을 조회",
+          "source_ids": [
+            "IFM-OPT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        },
+        {
+          "item": "안전 거리에서 광학면·반사판의 오염·위치 변동을 육안으로 기록",
+          "source_ids": [
+            "IFM-DIRT",
+            "IFM-OPT"
+          ],
+          "observation_mode": "existing_record_or_safe_external_observation",
+          "safety_gate": "no_touch"
+        }
+      ],
+      "candidate_causes": [
+        {
+          "candidate": "광학면의 먼지·오일·수분 영향",
+          "why_to_consider": "수광 여유의 감소가 간헐적인 신호와 연관될 수 있음",
+          "source_ids": [
+            "IFM-DIRT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "광축 정렬 및 설치 조건",
+          "why_to_consider": "센서 방식별 정렬은 검출 안정성에 중요함",
+          "source_ids": [
+            "IFM-OPT"
+          ],
+          "not_confirmed": true
+        },
+        {
+          "candidate": "실제 제어 입력과 센서 출력 불일치",
+          "why_to_consider": "센서 자체 문제인지 제어 기록 문제인지 구분 필요",
+          "source_ids": [
+            "IFM-OPT"
+          ],
+          "not_confirmed": true
+        }
+      ],
+      "missing_evidence_questions": [
+        "오탐지 시 센서 LED와 PLC 입력 기록이 함께 바뀌었나요?",
+        "주변 빛·먼지·진동 상황이 기록됐나요?",
+        "센서 정확한 모델명은 무엇인가요?"
+      ],
+      "limitations": [
+        "실제 모델·회로도·안전 절차가 확인되지 않아 원인 확정 불가"
+      ],
+      "required_safety_gate": "설비 내부 접근·커버 개방·걸림 해소·배선 측정·부품 조정 전에는 현장 승인자와 장비별 에너지 차단·잠금·잔류 에너지 확인이 필요함",
+      "stop_escalation": "끼임·화재·연기·절연 손상·이상 소음·예기치 않은 기동 위험이 있으면 임의 시운전하지 말고 현장 규정에 따라 정지 및 담당자에게 보고",
+      "excluded_actions": [
+        "안전 인터록 우회",
+        "전원 인가 상태의 커버 개방",
+        "무단 반복 재가동",
+        "원격 제어·자동 복구"
+      ]
+    }
+  ],
+  "safety_policy": {
+    "scope": "초기 교육·검토용 사례. 진단 확정 및 기계 조작 절차 제공 안 함",
+    "locale_note": "OSHA/HSE 해외 규정은 참고 자료. 국내 법령 및 사업장 규정, OEM 매뉴얼 우선",
+    "mandatory_notice": "모든 고장 후보는 미확정이며 실제 설비 모델·증상·기록의 검증을 거쳐야 함",
+    "prohibitions": [
+      "장비 제어 명령",
+      "안전 장치 우회",
+      "에너지 격리 없는 기계 내부 접근",
+      "고장 원인 자동 확정",
+      "검증되지 않은 알람 코드 매핑"
+    ]
+  },
+  "agent_ml_owner": "Antigravity",
+  "external_transfer_enabled": false
+}
