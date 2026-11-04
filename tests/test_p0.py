@@ -3,6 +3,7 @@ import importlib.util
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from fastapi.testclient import TestClient
 from faultmate.app import app
@@ -52,7 +53,9 @@ def test_invalid_ports_rejected():
 
 def test_entrypoint_import_from_elsewhere():
     code = "from pathlib import Path; import sys;sys.path.insert(0,sys.argv[1]);from scripts.start import load_app;app=load_app();print(app.title)"
-    p = subprocess.run([sys.executable,'-c',code,str(ROOT)],cwd='/tmp',capture_output=True,text=True,timeout=10)
+    with tempfile.TemporaryDirectory(prefix='faultmate-import-cwd-') as cwd:
+        p = subprocess.run([sys.executable,'-c',code,str(ROOT)],cwd=cwd,
+                           capture_output=True,text=True,timeout=10)
     assert p.returncode == 0, p.stderr
     assert p.stdout.strip() == 'FaultMate AI'
 
