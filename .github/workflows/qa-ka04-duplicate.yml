@@ -1,0 +1,48 @@
+name: KA04 official sensor duplicate quality audit
+on:
+  push:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
+    paths:
+      - .github/workflows/qa-ka04-duplicate.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-real-ka04:
+    runs-on: windows-2025
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only science and test dependencies
+        run: python -m pip install numpy scipy pytest
+      - name: Verify synthetic duplicate test contract
+        run: python -m pytest -q tests/test_qa_bearing_recording_duplicates.py tests/test_paderborn_asset_catalog.py
+      - name: Download official KA04 archive to ephemeral storage
+        shell: pwsh
+        run: |
+          $url = 'https://zenodo.org/records/15845309/files/KA04.rar?download=1'
+          $archive = Join-Path $env:RUNNER_TEMP 'KA04.rar'
+          & curl.exe --fail --location --retry 2 --connect-timeout 20 --max-time 420 --silent --show-error $url --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item $archive | Select-Object FullName, Length
+      - name: Validate archive official MD5 and inspect real 17 versus 18 signals
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'KA04.rar'
+          $report = Join-Path $env:RUNNER_TEMP 'ka04-quality.json'
+          python scripts/qa_bearing_recording_duplicates.py --archive $archive --bearing KA04 --condition N09_M07_F10 --trials 17 18 > $report
+          if ($LASTEXITCODE -ne 0) { if (Test-Path $report) { Get-Content $report }; exit $LASTEXITCODE }
+          Get-Content $report
+      - name: Upload JSON evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ka04-real-duplicate-qa-json
+          path: \${{ runner.temp }}/ka04-quality.json
+          if-no-files-found: warn
+          retention-days: 7
