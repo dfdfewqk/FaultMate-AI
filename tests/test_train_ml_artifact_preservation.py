@@ -55,3 +55,22 @@ def test_single_existing_artifact_blocks_write(tmp_path, name):
         train(source, output)
     assert target.read_text(encoding='utf-8') == 'DO_NOT_TOUCH'
     assert len(list(output.iterdir())) == 1
+
+
+def test_identical_measurement_different_trial_id_blocks_training(tmp_path):
+    source = tmp_path / 'synthetic.csv'
+    synthetic_input(source)
+    with source.open(encoding='utf-8', newline='') as stream:
+        records = list(csv.DictReader(stream))
+    # Duplicate one real observation under a new trial ID. This must not count twice.
+    duplicate = records[0].copy()
+    duplicate['trial_id'] = 'T99'
+    records.append(duplicate)
+    with source.open('w', encoding='utf-8', newline='') as stream:
+        writer = csv.DictWriter(stream, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(records)
+    target = tmp_path / 'evaluation'
+    with pytest.raises(ValueError, match='duplicate_recording_features_for_asset'):
+        train(source, target)
+    assert not target.exists()
