@@ -34,6 +34,10 @@ jobs:
         run: node --check web/app.js
       - name: Real local HTTP subprocess smoke
         run: PYTHONPATH=. python tests/live_http_smoke.py
+      - name: Prepare screenshot directory used by existing browser fixtures
+        run: |
+          sudo mkdir -p /mnt/data
+          sudo chown "$(id -u):$(id -g)" /mnt/data
       - name: Browser smoke and regression suites
         run: |
           for file in tests/browser_smoke.py tests/browser_step1.py tests/browser_step2.py tests/browser_step3.py tests/browser_step4.py tests/browser_step5.py tests/browser_final_integration.py; do
