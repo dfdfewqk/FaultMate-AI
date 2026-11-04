@@ -1,0 +1,50 @@
+name: K001 one-time provenance and MAT inspection
+on:
+  push:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
+    paths:
+      - .github/workflows/validate-k001.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-k001:
+    name: Verify Zenodo K001 and inspect one MAT recording
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install inspection-only dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y 7zip
+          python -m pip install --disable-pip-version-check numpy scipy
+      - name: Download official archive to ephemeral runner storage
+        env:
+          ARCHIVE_URL: https://zenodo.org/records/15845309/files/K001.rar?download=1
+        run: |
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 360 --silent --show-error "$ARCHIVE_URL" --output "$RUNNER_TEMP/K001.rar"
+          ls -lh "$RUNNER_TEMP/K001.rar"
+      - name: Verify source checksum and archive contents
+        run: |
+          python scripts/verify_k001_archive.py --archive "$RUNNER_TEMP/K001.rar" > "$RUNNER_TEMP/k001-provenance.json"
+          cat "$RUNNER_TEMP/k001-provenance.json"
+      - name: Read one real MATLAB recording and report raw Unit values
+        run: |
+          python scripts/inspect_paderborn_archive.py --archive "$RUNNER_TEMP/K001.rar" > "$RUNNER_TEMP/k001-channels.json"
+          cat "$RUNNER_TEMP/k001-channels.json"
+      - name: Upload inspection JSON only (no raw data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k001-validation-json
+          path: |
+            ${{ runner.temp }}/k001-provenance.json
+            ${{ runner.temp }}/k001-channels.json
+          if-no-files-found: warn
+          retention-days: 7
