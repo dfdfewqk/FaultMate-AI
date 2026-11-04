@@ -12,3 +12,5 @@ web/node_modules/
 /data/converted/
 *.rar
 *.mat
+/models/bearing_validated.json
+/models/review*.json
