@@ -1,0 +1,32 @@
+name: FaultMate independent Python and JS regression
+on:
+  push:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
+    paths:
+      - .github/workflows/faultmate-regression.yml
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Full Python tests and JavaScript syntax
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install declared app and ML dependencies and test client
+        run: |
+          python -m pip install -r requirements-ml.txt
+          python -m pip install pytest httpx
+      - name: All Python regression tests
+        run: python -m pytest -q tests
+      - name: JavaScript syntax verification
+        run: node --check web/app.js
