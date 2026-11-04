@@ -94,12 +94,12 @@ def train(input_csv: Path, output_dir: Path):
            'heldout_evaluation':metrics}
     output_dir.mkdir(parents=True,exist_ok=True)
     with (output_dir/'bearing_evaluated.json').open('x', encoding='utf-8') as fp:
-        fp.write(json.dumps(model,ensure_ascii=False,indent=2)+'\n')
+        fp.write(json.dumps(model,ensure_ascii=True,indent=2)+'\n')
     with (output_dir/'evaluation_report.json').open('x', encoding='utf-8') as fp:
         fp.write(json.dumps({**metrics,
             'data_sha256':model['data_sha256'], 'source_id':model['source_id'],
             'license':model['license'],'partition_by_asset':partition,
-            'note':'교육용 실험 데이터 평가. 현장 안전·고장 예측 성능 보증 아님.'},ensure_ascii=False,indent=2)+'\n')
+            'note':'교육용 실험 데이터 평가. 현장 안전·고장 예측 성능 보증 아님.'},ensure_ascii=True,indent=2)+'\n')
     return metrics
 
 
