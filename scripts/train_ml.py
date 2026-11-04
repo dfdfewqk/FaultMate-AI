@@ -61,11 +61,21 @@ def train(input_csv: Path, output_dir: Path):
     if candidate_f1 <= baseline_f1:
         raise ValueError('candidate_does_not_beat_validation_baseline')
     ypred=candidate.predict(testn)
+    matrix=confusion_matrix(yt,ypred,labels=list(EXPECTED_LABELS)).tolist()
+    # Classes are damaged, healthy. Surface the safety-relevant two error types
+    # explicitly rather than leaving them buried in a confusion matrix.
+    split_counts = {
+        name: dict(Counter(next(iter(per_asset[asset])) for asset in group))
+        for name, group in (('train', tr), ('validation', val), ('test', test))
+    }
     metrics={'validation_macro_f1':round(float(candidate_f1),4),
              'validation_dummy_macro_f1':round(float(baseline_f1),4),
              'heldout_macro_f1':round(float(f1_score(yt,ypred,average='macro',zero_division=0)),4),
-             'heldout_confusion_matrix':confusion_matrix(yt,ypred,labels=list(EXPECTED_LABELS)).tolist(),
+             'heldout_confusion_matrix':matrix,
+             'heldout_damage_missed_count':int(matrix[0][1]),
+             'heldout_false_damage_alarm_count':int(matrix[1][0]),
              'heldout_classification':classification_report(yt,ypred,labels=list(EXPECTED_LABELS),output_dict=True,zero_division=0),
+             'split_asset_counts_by_label':split_counts,
              'train_asset_count':len(tr),'validation_asset_count':len(val),'test_asset_count':len(test)}
     assert not (set(tr)&set(val) or set(tr)&set(test) or set(val)&set(test))
     model={'status':'evaluated_pending_review','scope':'experimental_bearing_feature_windows_only',
