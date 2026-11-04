@@ -2,16 +2,18 @@
 setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 set "PYTHON_CMD="
-where py >nul 2>&1
+rem Prefer the Python selected on PATH (including CI) over py -3's newest
+rem globally installed interpreter. This does not modify an existing .venv.
+where python >nul 2>&1
 if not errorlevel 1 (
-  py -3 -c "import sys;sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
-  if not errorlevel 1 set "PYTHON_CMD=py -3"
+  python -c "import sys;sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+  if not errorlevel 1 set "PYTHON_CMD=python"
 )
 if not defined PYTHON_CMD (
-  where python >nul 2>&1
+  where py >nul 2>&1
   if not errorlevel 1 (
-    python -c "import sys;sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
-    if not errorlevel 1 set "PYTHON_CMD=python"
+    py -3 -c "import sys;sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+    if not errorlevel 1 set "PYTHON_CMD=py -3"
   )
 )
 if not exist ".venv\Scripts\python.exe" (
