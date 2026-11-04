@@ -28,15 +28,28 @@ def configured() -> bool:
     return bool(os.environ.get('DEEPSEEK_API_KEY','').strip())
 
 
+class _BlockProviderRedirects(urlrequest.HTTPRedirectHandler):
+    """Never forward the user's paid API credential to a redirect location."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("upstream_redirect_blocked")
+
+
 def _invoke_deepseek(context: dict, api_key: str) -> dict:
+    # An unexpectedly large local context must not be shipped to a paid API.
+    context_wire = json.dumps(context, ensure_ascii=False)
+    if len(context_wire.encode("utf-8")) > 64 * 1024:
+        raise ValueError("agent_context_too_large")
     body = json.dumps({'model':'deepseek-chat','messages':[
         {'role':'system','content':SYSTEM},
-        {'role':'user','content':'Sort the following unverified local evidence. Output JSON only:\n' + json.dumps(context, ensure_ascii=False)},
+        {'role':'user','content':'Sort the following unverified local evidence. Output JSON only:\n' + context_wire},
     ],'response_format':{'type':'json_object'},'stream':False,'max_tokens':600},ensure_ascii=False).encode('utf-8')
     req = urlrequest.Request(ENDPOINT,data=body,method='POST',headers={
         'Authorization':'Bearer '+api_key,'Content-Type':'application/json','Accept':'application/json',
     })
-    with urlrequest.urlopen(req,timeout=20) as res:
+    # urllib's default opener follows redirects. Refuse them for bearer keys.
+    opener = urlrequest.build_opener(_BlockProviderRedirects())
+    with opener.open(req, timeout=20) as res:
         wire = res.read(128 * 1024 + 1)
     if len(wire) > 128 * 1024:
         raise ValueError('oversized_upstream_response')
@@ -44,7 +57,13 @@ def _invoke_deepseek(context: dict, api_key: str) -> dict:
     choice = response['choices'][0]
     if choice.get('finish_reason') != 'stop':
         raise ValueError('incomplete_upstream_result')
-    return json.loads(choice['message']['content'])
+    content = choice['message']['content']
+    if not isinstance(content, str) or len(content) > 8192:
+        raise ValueError("invalid_upstream_json_content")
+    parsed = json.loads(content)
+    if not isinstance(parsed, dict):
+        raise ValueError("upstream_result_must_be_json_object")
+    return parsed
 
 
 def _valid_indices(raw: object, length: int) -> list[int]:
