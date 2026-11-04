@@ -27,7 +27,7 @@ def fetch(base: str, path: str, payload: dict | None = None):
         return res.status, res.read(), res.headers
 
 
-def check(exe: Path):
+def check(exe: Path, *, local_only_batch: bool = False):
     if os.name != "nt":
         raise AssertionError("Compiled Windows EXE check requires Windows")
     if not exe.is_file():
@@ -43,14 +43,22 @@ def check(exe: Path):
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     env = os.environ.copy()
-    env.pop("DEEPSEEK_API_KEY", None)
+    if local_only_batch:
+        env["DEEPSEEK_API_KEY"] = "TEST_FAKE_KEY_MUST_BE_CLEARED"
+    else:
+        env.pop("DEEPSEEK_API_KEY", None)
     env["FAULTMATE_PORT"] = str(port)
     env["FAULTMATE_NO_BROWSER"] = "1"
     with tempfile.TemporaryDirectory(prefix="faultmate-compiled-smoke-") as work:
         log_path = Path(work) / "app.log"
         with log_path.open("wb") as output:
-            proc = subprocess.Popen([str(exe)], cwd=work, env=env,
-                                    stdout=output, stderr=subprocess.STDOUT)
+            command = (["cmd.exe", "/d", "/c", str(exe.parent / "RUN_LOCAL_ONLY.bat")]
+                       if local_only_batch else [str(exe)])
+            if local_only_batch and not (exe.parent / "RUN_LOCAL_ONLY.bat").is_file():
+                raise AssertionError("Local-only safe batch launcher missing")
+            proc = subprocess.Popen(command, cwd=work, env=env,
+                                    stdout=output, stderr=subprocess.STDOUT,
+                                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
             try:
                 base = f"http://127.0.0.1:{port}"
                 for _ in range(100):
@@ -98,14 +106,16 @@ def check(exe: Path):
                 ai = json.loads(body)
                 assert code == 200 and ai["status"] == "blocked"
                 assert ai["external_transfer_performed"] is False
-                print("PORTABLE_EXE_PASS: local UI/API, case catalog, ML gate, hazard hold, no external transfer")
+                print("PORTABLE_EXE_PASS: " + ("safe BAT launch; " if local_only_batch else "direct EXE; ") +
+                      "local UI/API, case catalog, ML gate, hazard hold, no external transfer")
             except Exception:
                 output.flush()
                 print(log_path.read_text(encoding="utf-8", errors="replace")[-9000:],
                       file=sys.stderr)
                 raise
             finally:
-                proc.terminate()
+                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                               capture_output=True, check=False, timeout=12)
                 try:
                     proc.wait(timeout=10)
                 except subprocess.TimeoutExpired:
