@@ -38,11 +38,12 @@ jobs:
           python scripts/qa_bearing_recording_duplicates.py --archive $archive --bearing KA04 --condition N09_M07_F10 --trials 17 18 > $report
           if ($LASTEXITCODE -ne 0) { if (Test-Path $report) { Get-Content $report }; exit $LASTEXITCODE }
           Get-Content $report
+          Copy-Item -LiteralPath $report -Destination ka04-quality.json
       - name: Upload JSON evidence only
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ka04-real-duplicate-qa-json
-          path: \${{ runner.temp }}/ka04-quality.json
+          path: ka04-quality.json
           if-no-files-found: warn
           retention-days: 7
