@@ -7,3 +7,10 @@ web/node_modules/
 
 /models/evaluation/
 *.secrets
+.venv-ml/
+/data/raw/
+/data/converted/
+*.rar
+*.mat
+/models/bearing_validated.json
+/models/review*.json

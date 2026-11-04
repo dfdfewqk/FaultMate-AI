@@ -86,8 +86,27 @@ def load_validated_model() -> dict | None:
             return None
         if (model.get('status') != 'validated' or model.get('feature_names') != list(FEATURES)
             or model.get('classes') != list(EXPECTED_LABELS)
-            or not model.get('data_sha256') or not model.get('heldout_evaluation')
-            or not isinstance(model.get('source_id'),str) or not model['source_id']):
+            or model.get('scope') != 'experimental_bearing_feature_windows_only'
+            or model.get('source_id') != 'paderborn-bearing-datacenter'
+            or model.get('license') != 'CC BY-NC 4.0'
+            or not isinstance(model.get('data_sha256'), str)
+            or len(model['data_sha256']) != 64
+            or not model.get('heldout_evaluation')):
+            return None
+        # Prevent an unreviewed evaluated JSON from becoming an active model
+        # merely because someone manually changed its status field.
+        review = model.get('review_record')
+        checks = ('unit_calibration_verified', 'label_provenance_verified',
+                  'independent_assets_verified', 'heldout_errors_reviewed',
+                  'noncommercial_use_only')
+        if (not isinstance(review, dict)
+            or review.get('decision') != 'approved_for_experimental_use'
+            or review.get('data_sha256') != model['data_sha256']
+            or not isinstance(review.get('evaluated_sha256'), str)
+            or len(review['evaluated_sha256']) != 64
+            or not isinstance(review.get('reviewed_by'), str)
+            or len(review['reviewed_by'].strip()) < 2
+            or not all(review.get(key) is True for key in checks)):
             return None
         for key in ('mean','std','coef'):
             if len(model.get(key,[])) != len(FEATURES) or not all(isinstance(x,(float,int)) and math.isfinite(x) for x in model[key]):

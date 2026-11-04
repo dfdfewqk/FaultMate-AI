@@ -15,6 +15,9 @@ from faultmate.integration.ml import FEATURES, EXPECTED_LABELS, parse_feature_cs
 
 
 def train(input_csv: Path, output_dir: Path):
+    # Evaluations are review evidence; a rerun must never silently replace them.
+    if (output_dir / "bearing_evaluated.json").exists() or (output_dir / "evaluation_report.json").exists():
+        raise ValueError("evaluation_artifacts_already_exist; choose_a_fresh_output_directory")
     import numpy as np
     from sklearn.model_selection import train_test_split
     from sklearn.linear_model import LogisticRegression
@@ -24,6 +27,14 @@ def train(input_csv: Path, output_dir: Path):
 
     raw=input_csv.read_bytes()
     rows=parse_feature_csv(raw,training=True)
+    # Different trial IDs can still represent the same physical recording.
+    # Detect identical feature vectors within a bearing before fitting/splitting.
+    seen_by_asset = set()
+    for record in rows:
+        signature = (record['asset_id'], *(record[name] for name in FEATURES))
+        if signature in seen_by_asset:
+            raise ValueError('duplicate_recording_features_for_asset')
+        seen_by_asset.add(signature)
     if len({r['source_id'] for r in rows}) != 1 or len({r['license'] for r in rows}) != 1:
         raise ValueError('mixed_source_or_license_requires_separate_training')
     if len({r['label_provenance'] for r in rows}) < 2:
@@ -61,11 +72,21 @@ def train(input_csv: Path, output_dir: Path):
     if candidate_f1 <= baseline_f1:
         raise ValueError('candidate_does_not_beat_validation_baseline')
     ypred=candidate.predict(testn)
+    matrix=confusion_matrix(yt,ypred,labels=list(EXPECTED_LABELS)).tolist()
+    # Classes are damaged, healthy. Surface the safety-relevant two error types
+    # explicitly rather than leaving them buried in a confusion matrix.
+    split_counts = {
+        name: dict(Counter(next(iter(per_asset[asset])) for asset in group))
+        for name, group in (('train', tr), ('validation', val), ('test', test))
+    }
     metrics={'validation_macro_f1':round(float(candidate_f1),4),
              'validation_dummy_macro_f1':round(float(baseline_f1),4),
              'heldout_macro_f1':round(float(f1_score(yt,ypred,average='macro',zero_division=0)),4),
-             'heldout_confusion_matrix':confusion_matrix(yt,ypred,labels=list(EXPECTED_LABELS)).tolist(),
+             'heldout_confusion_matrix':matrix,
+             'heldout_damage_missed_count':int(matrix[0][1]),
+             'heldout_false_damage_alarm_count':int(matrix[1][0]),
              'heldout_classification':classification_report(yt,ypred,labels=list(EXPECTED_LABELS),output_dict=True,zero_division=0),
+             'split_asset_counts_by_label':split_counts,
              'train_asset_count':len(tr),'validation_asset_count':len(val),'test_asset_count':len(test)}
     assert not (set(tr)&set(val) or set(tr)&set(test) or set(val)&set(test))
     model={'status':'evaluated_pending_review','scope':'experimental_bearing_feature_windows_only',
@@ -80,11 +101,13 @@ def train(input_csv: Path, output_dir: Path):
            'generated_utc':datetime.now(timezone.utc).isoformat(),
            'heldout_evaluation':metrics}
     output_dir.mkdir(parents=True,exist_ok=True)
-    (output_dir/'bearing_evaluated.json').write_text(json.dumps(model,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-    (output_dir/'evaluation_report.json').write_text(json.dumps({**metrics,
-        'data_sha256':model['data_sha256'], 'source_id':model['source_id'],
-        'license':model['license'],'partition_by_asset':partition,
-        'note':'교육용 실험 데이터 평가. 현장 안전·고장 예측 성능 보증 아님.'},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    with (output_dir/'bearing_evaluated.json').open('x', encoding='utf-8') as fp:
+        fp.write(json.dumps(model,ensure_ascii=True,indent=2)+'\n')
+    with (output_dir/'evaluation_report.json').open('x', encoding='utf-8') as fp:
+        fp.write(json.dumps({**metrics,
+            'data_sha256':model['data_sha256'], 'source_id':model['source_id'],
+            'license':model['license'],'partition_by_asset':partition,
+            'note':'교육용 실험 데이터 평가. 현장 안전·고장 예측 성능 보증 아님.'},ensure_ascii=True,indent=2)+'\n')
     return metrics
 
 

@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import subprocess
+import tempfile
 import sys
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -52,7 +53,7 @@ def test_invalid_ports_rejected():
 
 def test_entrypoint_import_from_elsewhere():
     code = "from pathlib import Path; import sys;sys.path.insert(0,sys.argv[1]);from scripts.start import load_app;app=load_app();print(app.title)"
-    p = subprocess.run([sys.executable,'-c',code,str(ROOT)],cwd='/tmp',capture_output=True,text=True,timeout=10)
+    p = subprocess.run([sys.executable,'-c',code,str(ROOT)],cwd=tempfile.gettempdir(),capture_output=True,text=True,timeout=10)
     assert p.returncode == 0, p.stderr
     assert p.stdout.strip() == 'FaultMate AI'
 
