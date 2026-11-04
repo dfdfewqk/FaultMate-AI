@@ -1,5 +1,8 @@
 name: FaultMate independent Python JS browser and HTTP regression
 on:
+  pull_request:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
   push:
     branches:
       - work/faultmate-ml-converter-fix-20261030
@@ -43,3 +46,21 @@ jobs:
           for file in tests/browser_smoke.py tests/browser_step1.py tests/browser_step2.py tests/browser_step3.py tests/browser_step4.py tests/browser_step5.py tests/browser_final_integration.py; do
             PYTHONPATH=. python "$file" || exit 1
           done
+
+  windows-batch-smoke:
+    name: Windows BAT launch, HTTP and fail-closed integrations
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare production dependencies in isolated Windows venv
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          & '.\.venv\Scripts\python.exe' -m pip install -r requirements.txt
+      - name: Start real Windows BAT launcher and verify HTTP safety
+        shell: pwsh
+        run: '& .\scripts\ci_smoke_windows.ps1'
