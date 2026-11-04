@@ -27,6 +27,14 @@ def train(input_csv: Path, output_dir: Path):
 
     raw=input_csv.read_bytes()
     rows=parse_feature_csv(raw,training=True)
+    # Different trial IDs can still represent the same physical recording.
+    # Detect identical feature vectors within a bearing before fitting/splitting.
+    seen_by_asset = set()
+    for record in rows:
+        signature = (record['asset_id'], *(record[name] for name in FEATURES))
+        if signature in seen_by_asset:
+            raise ValueError('duplicate_recording_features_for_asset')
+        seen_by_asset.add(signature)
     if len({r['source_id'] for r in rows}) != 1 or len({r['license'] for r in rows}) != 1:
         raise ValueError('mixed_source_or_license_requires_separate_training')
     if len({r['label_provenance'] for r in rows}) < 2:
