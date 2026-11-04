@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - work/faultmate-windows-integration-20261104
+      - work/faultmate-windows-integration-20261104-reconciled
     paths:
       - .github/workflows/windows-integration.yml
       - tests/windows_launcher_smoke.py
