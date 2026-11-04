@@ -8,6 +8,13 @@ on:
       - work/faultmate-ml-converter-fix-20261030
     paths:
       - .github/workflows/faultmate-regression.yml
+      - tests/test_p0.py
+      - scripts/ci_smoke_windows.ps1
+      - setup_windows.bat
+      - start_windows.bat
+      - scripts/start.py
+      - faultmate/**
+      - web/**
 
 permissions:
   contents: read
