@@ -1,0 +1,30 @@
+name: FaultMate ML integrity regression
+on:
+  push:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
+    paths:
+      - .github/workflows/faultmate-ml-integrity.yml
+      - scripts/train_ml.py
+      - scripts/qa_bearing_recording_duplicates.py
+      - tests/test_train_ml_artifact_preservation.py
+      - tests/test_qa_bearing_recording_duplicates.py
+
+permissions:
+  contents: read
+
+jobs:
+  test-ml-data-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared app and ML dependencies
+        run: |
+          python -m pip install -r requirements-ml.txt
+          python -m pip install pytest httpx
+      - name: Run entire Python suite including duplicate-bearing regression
+        run: python -m pytest -q tests
