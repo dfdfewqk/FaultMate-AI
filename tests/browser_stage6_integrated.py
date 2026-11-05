@@ -73,8 +73,8 @@ async def run():
                 await page.wait_for_function("document.querySelector('#triage-feedback').textContent.includes('설비와 사례')")
 
                 await page.locator("#triage-equipment").select_option("컨베이어")
-                await page.locator("#triage-case").select_option("CONV-001")
                 await page.locator("#triage-symptom").fill("STAGE6_PRIVATE_SYMPTOM")
+                await page.locator("#triage-case").select_option("CONV-001")
                 await page.locator("#triage-submit").click()
                 await page.locator("#triage-result .result-cause").first.wait_for()
                 assert await page.locator("#agent-run").is_disabled()
