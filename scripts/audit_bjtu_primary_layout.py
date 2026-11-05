@@ -197,6 +197,13 @@ def probe_public_folder_metadata(*, timeout_seconds: int = 55) -> dict:
         # originals, since its documented folder limit can truncate results.
         result["google_drive_folder_reachable"] = True
         result["metadata_entries_returned"] = len(paths)
+        # The authors publicly shared this source: keep only relative display
+        # names, never Google file IDs, download tokens, cookies or CSV contents.
+        # This may be a PARTIAL gdown listing, not the 51-state inventory.
+        result["public_entry_path_sample"] = sorted({
+            re.sub(r"[^\\w/.+() -]", "_", p)[:180]
+            for p in paths if p and len(p) < 500
+        })[:25]
         result["metadata_listing_complete"] = False
         result["normal_folder_structurally_verified"] = False
     except (OSError, subprocess.TimeoutExpired, ValueError, KeyError,
