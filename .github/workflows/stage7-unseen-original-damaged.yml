@@ -1,0 +1,147 @@
+name: FaultMate Stage7 unseen REAL damaged bearings (frozen model, NO train or release)
+on:
+  push:
+    branches:
+      - work/faultmate-ml-unseen-damage-validation-20261105
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: faultmate-unseen-real-damaged-original-20261105
+  cancel-in-progress: false
+
+jobs:
+  software-and-frozen-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing declared ML and test requirements
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: All existing and new original-source/test embargo tests
+        run: |
+          python -m pytest -q tests
+          python -m compileall -q scripts faultmate
+      - name: Verify frozen model and 8 predefined original MD5s BEFORE data are read
+        run: |
+          python - <<'PY'
+          from scripts.extract_unseen_paderborn_damaged import verified_manifest
+          from scripts.evaluate_unseen_paderborn_damaged import frozen_coefficients
+          from faultmate.integration.ml import load_validated_model
+          doc = verified_manifest()
+          model = frozen_coefficients()
+          assert len(doc["assets"]) == 8 and model["threshold"] == .5
+          assert load_validated_model() is None
+          print("UNSEEN_8_REAL_DAMAGED_PREREGISTERED_FROZEN_MODEL_UNAPPROVED")
+          PY
+
+  verify-eight-new-original-bearings:
+    needs: software-and-frozen-model
+    name: Original Paderborn 80-MAT new damaged ${{ matrix.bearing }}
+    runs-on: windows-2025
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        bearing: [KA15, KA22, KA30, KB24, KB27, KI14, KI17, KI21]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install source readers and signal feature dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-ml.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download ONLY preregistered original Zenodo RAR to temporary CI runner
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP '${{ matrix.bearing }}.rar'
+          & curl.exe --fail --location --retry 2 --connect-timeout 25 --max-time 650 --silent --show-error 'https://zenodo.org/records/15845309/files/${{ matrix.bearing }}.rar?download=1' --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Item $archive).Length -lt 100000000) { throw "official original unexpectedly short" }
+      - name: Verify known official MD5 + 7z integrity + all 80 original MAT, extract source-bound shape features
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path unseen-reports | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP '${{ matrix.bearing }}.rar'
+          python scripts/extract_unseen_paderborn_damaged.py --archive $archive --bearing-id '${{ matrix.bearing }}' --out 'unseen-reports/${{ matrix.bearing }}.json'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content 'unseen-reports/${{ matrix.bearing }}.json' -Raw | ConvertFrom-Json
+          if ($r.source_recording_count -ne 80 -or $r.label -ne 'damaged' -or $r.approved_for_runtime -ne $false) {
+            throw "unseen original recording and label contract failed"
+          }
+          Write-Output "NEW_PADERBORN_DAMAGED_VERIFIED: ${{ matrix.bearing }} 80 actual MAT"
+      - name: Preserve only 12 shape features per original (NEVER raw MAT or RAR)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage7-unseen-damaged-${{ matrix.bearing }}
+          path: unseen-reports/${{ matrix.bearing }}.json
+          retention-days: 30
+          if-no-files-found: error
+
+  frozen-eight-damage-evaluation:
+    needs: verify-eight-new-original-bearings
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Only declared numpy/scipy dependencies
+        run: python -m pip install -r requirements-ml.txt
+      - name: Fetch every preregistered original-source report from THIS same CI run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: stage7-unseen-damaged-*
+          path: unseen-reports
+          merge-multiple: true
+      - name: Verify EXACT eight reports and exclude already opened/dev assets
+        run: |
+          test "$(find unseen-reports -maxdepth 1 -type f -name '*.json' | wc -l)" -eq 8
+          test ! -e unseen-reports/K001.json
+          test ! -e unseen-reports/K006.json
+          test ! -e unseen-reports/KI18.json
+          echo "EIGHT_NEW_ORIGINAL_DAMAGED_REPORTS_ONLY"
+      - name: Evaluate original FROZEN model, NEVER fit or change thresholds
+        run: |
+          python scripts/evaluate_unseen_paderborn_damaged.py \
+            --new-feature-dir unseen-reports \
+            --out models/evaluation/one_time_unseen_damaged_20261105.json
+      - name: Fail closed on unsupported overall accuracy or model deployment
+        run: |
+          python - <<'PY'
+          import json
+          from faultmate.integration.ml import load_validated_model
+          p = "models/evaluation/one_time_unseen_damaged_20261105.json"
+          r = json.load(open(p))
+          assert r["status"] == "one_time_unseen_damaged_only_sensitivity_no_model_approval"
+          assert r["new_unseen_damaged_bearings"] == 8
+          assert r["source"]["source_mat_files"] == 640
+          assert r["overall_accuracy_measured"] is False
+          assert r["specificity_measured"] is False
+          assert r["new_healthy_bearings"] == 0
+          assert r["refitting_or_threshold_tuning_performed"] is False
+          assert r["model_activated"] is False
+          assert load_validated_model() is None
+          print("ACTUAL_ONE_TIME_UNSEEN_DAMAGED_SENSITIVITY_ONLY_NO_DEPLOYMENT")
+          PY
+      - name: Save derived small evaluation report ONLY
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage7-one-time-unseen-8-damaged-evaluation-unapproved
+          path: models/evaluation/one_time_unseen_damaged_20261105.json
+          retention-days: 30
+          if-no-files-found: error
