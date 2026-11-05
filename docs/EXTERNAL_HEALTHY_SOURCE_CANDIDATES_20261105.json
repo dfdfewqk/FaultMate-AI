@@ -98,6 +98,30 @@
       "independent_data_acquisition_site": true,
       "other_domain_equivalence_reviewed": false,
       "remarks": "Variable-speed different-source rig. Rate/time alignment and comparable asset-level conditions not proven."
+    },
+    {
+      "source_id": "phm24_bjtu_rao_bogie",
+      "source_url": "https://academic.oup.com/tse/article/8/2/tdag011/8644296",
+      "dataset_name": "BJTU-RAO bogie / PHM 2024 bearing and drivetrain competition",
+      "license": "not_verified_for_source_data",
+      "healthy_reference_reported": true,
+      "nominal_sample_rate_vibration_hz": 64000,
+      "nominal_sample_rate_current_hz": 64000,
+      "operating_condition_count": 9,
+      "matched_paderborn_condition_protocol": false,
+      "paired_vibration_motor_current": true,
+      "physical_healthy_asset_ids": null,
+      "independent_physical_asset_inventory_verified": false,
+      "source_archive_integrity_verified": false,
+      "source_raw_signal_integrity_verified": false,
+      "source_conditions_per_asset_verified": false,
+      "independent_data_acquisition_site": true,
+      "other_domain_equivalence_reviewed": false,
+      "original_download_and_usage_terms_verified": false,
+      "primary_evidence": "2026 Oxford Academic PHM24 paper and 2025 BJTU-RAO experiment paper",
+      "additional_evidence_url": "https://doi.org/10.1108/SRT-11-2024-0017",
+      "source_distribution_review_url": "https://github.com/jonathanadamrico/BJTU_PHM_Beijing_Benchmark",
+      "remarks": "64 kHz co-recorded vibration/current and a normal health state reported; equipment is subway train axlebox/motor/gear, NOT type 6203 and NOT the Paderborn 4 conditions x 20 runs. Exact distinct physical healthy axlebox bearing IDs, official original hashes, dataset reuse license, raw format & independent normal subset have NOT been verified. PHM contest data may duplicate BJTU-RAO samples. Do not evaluate the frozen Paderborn model or claim a new specificity."
     }
   ],
   "safety_limits": [
@@ -107,6 +131,8 @@
     "Do not relabel a new dataset's 3 loads or variable speed traces as Paderborn's 4 original conditions.",
     "Do not silently resample, add missing current channels or infer physical units.",
     "Any externally adapted model is NEW and requires independent validation; previously opened assets do not become fresh tests.",
-    "Frozen Paderborn experiment remains unapproved and inaccessible from runtime."
+    "Frozen Paderborn experiment remains unapproved and inaccessible from runtime.",
+    "PHM2024/BJTU-RAO are potentially overlapping distributions, not two independent healthy datasets; verifying physical asset IDs is essential.",
+    "A 64kHz sampling match alone does NOT establish same sensor location, axlebox bearing type, four Paderborn operating conditions, original signal identity, or permitted reuse."
   ]
 }
