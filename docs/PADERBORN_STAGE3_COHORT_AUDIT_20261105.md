@@ -42,3 +42,26 @@ Existing main branch, original records, previous ML artifacts, UI and binaries a
 ## Remain blocked
 
 Raw MATLAB channel Unit values are not proven to be in m/s^2 or amperes; source-specific calibration is unresolved. Physical-unit CSV conversion, model learning and approval remain disabled. The physical bearing, not its trial, must be the split group in any later ML assessment.
+
+## Final actual execution results (2026-11-05 UTC)
+
+- Independent original-source CI: https://github.com/dfdfewqk/FaultMate-AI/actions/runs/41957475830
+  - ALL 12 independent bearing jobs passed source RAR MD5, complete 7-Zip integrity, official 80-filename inventory and 80 MAT signal decoding.
+  - Original multi-OS aggregation initially failed on K001 because Windows CRLF checkout and Linux LF checkout produced different byte-level SHA256 values for the same official catalog JSON.
+  - This was diagnosed by independently reproducing both hashes for the identical catalog: LF be8abe1ea64e92119ad244668f4305402c6cc31687fd8737f937aa3b717e21a3 vs CRLF 3057511fd8ba99a823e62b28b4c85d6dda6ebc0d06e19a40e5447ed9152feb63.
+  - The aggregator now permits only those two line-ending representations of the pinned actual catalog. Other digests remain rejected.
+- Corrected full cohort aggregate run, **SUCCESS**: https://github.com/dfdfewqk/FaultMate-AI/actions/runs/41958473911
+  - Reused the 12 actual JSON audit artifacts without redownloading 2 GB of RAR source data.
+  - 12/12 physical bearing archives, healthy=6, damaged=6, 960/960 MATLAB recordings, no missing bearing/audit or cross-bearing duplicate.
+  - 956 unique (vibration_1 + phase_current_1) raw-signal pairs; four duplicate recordings, ALL on KA04:
+    1. N09_M07_F10_KA04_18 duplicates 17.
+    2. N15_M07_F04_KA04_15 duplicates 6.
+    3. N15_M07_F04_KA04_19 duplicates 5.
+    4. N15_M07_F04_KA04_20 duplicates 6 (hence 6/15/20 are a three-way repeat).
+  - Only the four repeated trials must be excluded/deduplicated as measurements. KA04 remains ONE damaged physical bearing. Other eleven bearings had zero repeated raw-signal pairs.
+  - Result status raw_archives_audited_calibration_unverified, cohort_raw_audit_complete=true, unique_raw_signals_in_inspected_recordings=956, fully_audited_bearings=12, minimum_bearing_counts_met=true.
+  - Safety flags: physical_units_verified=false, si_csv_generated=false, model_trained=false, model_activated=false, training_permitted=false.
+- Latest complete regression: https://github.com/dfdfewqk/FaultMate-AI/actions/runs/41958416836 **219 passed**.
+- Dedicated offline cross-platform raw aggregate regression in successful aggregate job: **17 passed**.
+
+**Stage 3 conclusion**: original 12-bearing archive/file inventory, source labeling and raw-signal duplication audit complete with recorded evidence, but NOTHING is validated in physical SI units. Stage 4 must not run actual feature training until the previously identified Paderborn calibration blocker is genuinely resolved; no fabricated SI features or false model predictions.
