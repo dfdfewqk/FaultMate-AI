@@ -1,0 +1,43 @@
+name: FaultMate Windows launcher integration
+on:
+  push:
+    branches:
+      - work/faultmate-windows-integration-20261104
+      - work/faultmate-windows-integration-20261104-reconciled
+    paths:
+      - .github/workflows/windows-integration.yml
+      - tests/windows_launcher_smoke.py
+      - setup_windows.bat
+      - start_windows.bat
+      - scripts/start.py
+
+permissions:
+  contents: read
+
+jobs:
+  windows-launch:
+    runs-on: windows-2025
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Execute the existing Windows setup batch from scratch
+        shell: cmd
+        run: call setup_windows.bat
+      - name: Install declared ML libraries and test-only tools into isolated CI environment
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt pytest httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run all Python regression tests
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pytest -q tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Execute real Windows start_windows.bat and exercise the local API
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe tests/windows_launcher_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
