@@ -1,5 +1,7 @@
 # FaultMate AI — P7.2 최종 통합·디버깅 버전
 
+> **최신 작업 상태 (2026-11-05)** — 이 README의 P7.2 상세 설명은 기존 구현 기록입니다. 현재 작업은 **5단계 완료(모의 DeepSeek 검사) → 통합 전 정리 → 6단계 통합 예정**입니다. 12개 Paderborn 원본/960 MAT 감사에는 합격했으나 **센서 물리 단위가 확정되지 않아 실제 ML 학습·평가/모델 활성화가 차단**돼 있습니다. DeepSeek 실제 유료 API 실호출·사용자 Windows 최종 실기기 테스트·EXE/ZIP 배포는 하지 않았습니다. [현재 정리·보존 현황](docs/PREINTEGRATION_CLEANUP_20261105.md) · [4단계 ML 승인 조건](docs/STAGE4_ML_READINESS_20261105.md) · [5단계 AI 연동 검증](docs/STAGE5_DEEPSEEK_TRANSPORT_20261105.md)
+
 컨베이어·모터·센서의 **고장 원인 후보와 추가 확인 질문**을 정리하는 교육·포트폴리오용 로컬 앱입니다. 자동 고장 확정, 설비 제어, 인터록 우회, 작업 허가 기능이 없습니다.
 
 ## 현재 구현
@@ -38,12 +40,7 @@ node --check web/app.js
 PYTHONPATH=. python tests/browser_smoke.py
 ```
 
-ML 학습(실제 물리 단위·출처·라벨 검증된 CSV를 확보한 경우에만):
-
-```bash
-pip install -r requirements-ml.txt
-python scripts/train_ml.py real_bearing_features.csv --output models/evaluation
-```
+ML 학습은 **검증된 실제 물리 단위와 원본별 특성 추적이 아직 없어 실행하지 않습니다.** 기존의 단순 CSV 학습 명령은 더 이상 충분하지 않습니다. 이후 실제 출처 보정·원본 감사·승인 기록이 준비된 경우에만 [4단계 명령 및 증빙 규약](docs/STAGE4_ML_READINESS_20261105.md)을 확인해 실행하세요.
 
 학습 결과는 기본적으로 **배포 불가인 평가용(`evaluated_pending_review`)**입니다. 실제 정답 데이터가 없으면 수행하지 마세요. Paderborn 원데이터는 **CC BY-NC 4.0**, 상업적 사용은 별도 허가 필요.
 
