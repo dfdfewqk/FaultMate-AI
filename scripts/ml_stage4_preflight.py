@@ -66,8 +66,28 @@ def _check_source_review(review: dict, raw_csv: bytes, summary_path: Path,
         or review.get("calibration_applies_to_whole_cohort") is not True
         or review.get("bearing_labels_verified") is not True):
         raise ValueError("source_specific_calibration_or_labels_not_reviewed")
-    if review.get("actual_stored_units") != {"vibration_1": "m/s^2", "phase_current_1": "A"}:
-        raise ValueError("stored_unit_mapping_not_si")
+    if review.get("feature_output_units") != {"vibration_1": "m/s^2", "phase_current_1": "A"}:
+        raise ValueError("feature_units_not_si")
+    transformations = review.get("source_channel_to_si")
+    if not isinstance(transformations, dict) or set(transformations) != {"vibration_1", "phase_current_1"}:
+        raise ValueError("source_channel_conversion_evidence_missing")
+    accepted = {
+        "vibration_1": {"m/s^2", "g", "V", "mV"},
+        "phase_current_1": {"A", "V", "mV"},
+    }
+    for channel, options in accepted.items():
+        conversion = transformations[channel]
+        if not isinstance(conversion, dict) or conversion.get("source_unit") not in options:
+            raise ValueError(f"unverified_source_unit:{channel}")
+        scale, offset = conversion.get("scale_to_si"), conversion.get("offset_in_source_unit")
+        if type(scale) not in (float, int) or not math.isfinite(scale) or scale <= 0:
+            raise ValueError(f"missing_source_scale:{channel}")
+        if type(offset) not in (float, int) or not math.isfinite(offset):
+            raise ValueError(f"missing_source_zero_offset:{channel}")
+        if conversion["source_unit"] in {"m/s^2", "A"} and (scale != 1 or offset != 0):
+            raise ValueError(f"native_si_unit_scale_conflict:{channel}")
+        if conversion["source_unit"] == "g" and not math.isclose(scale, 9.80665, rel_tol=1e-7):
+            raise ValueError(f"unjustified_g_to_si_scale:{channel}")
     if review.get("evidence_type") not in PRIMARY_EVIDENCE_KINDS:
         raise ValueError("primary_dataset_calibration_evidence_required")
     url = review.get("evidence_url")
