@@ -24,9 +24,21 @@ def fixture_files(tmp_path):
         'feature_names': list(ml.FEATURES),
         'mean': [1., 2., 3.], 'std': [1., 1., 1.],
         'coef': [1., 0., 0.], 'intercept': 0.,
+        'provenance_check': {
+            'source_verified': True, 'cohort_raw_audit_complete': True,
+            'human_calibration_review_present': True,
+            'source_audit_sha256': 'b'*64, 'review_sha256': 'c'*64,
+            'feature_ledger_sha256': 'd'*64,
+            'warning': 'SYNTHETIC test fixture; not genuine calibration evidence',
+        },
         'heldout_evaluation': {
             'validation_macro_f1': .8, 'validation_dummy_macro_f1': .4,
+            'validation_bearing_macro_f1': .8, 'validation_dummy_bearing_macro_f1': .4,
             'heldout_macro_f1': .7, 'heldout_confusion_matrix': [[2, 0], [1, 1]],
+            'heldout_bearing_macro_f1': .75,
+            'heldout_bearing_confusion_matrix': [[1, 0], [0, 1]],
+            'heldout_bearing_damage_missed_count': 0,
+            'heldout_bearing_false_damage_alarm_count': 0,
             'train_asset_count': 6, 'validation_asset_count': 2, 'test_asset_count': 2,
         },
     }
@@ -47,6 +59,9 @@ def fixture_files(tmp_path):
         'decision': 'approved_for_experimental_use',
         'evaluated_sha256': hashlib.sha256(evaluated.read_bytes()).hexdigest(),
         'data_sha256': model['data_sha256'],
+        'source_audit_sha256': 'b'*64,
+        'calibration_review_sha256': 'c'*64,
+        'feature_ledger_sha256': 'd'*64,
         'reviewed_by': 'TEST_ONLY_REVIEWER',
         'reviewed_utc': datetime.now(timezone.utc).isoformat(),
         'notes': 'Test fixture only; no real sensor units or physical labels verified.'
@@ -131,4 +146,25 @@ def test_invalid_partitions_or_baseline_rejected(tmp_path):
     data['partition_by_asset']['bearing_0'] = 'test'
     report.write_text(json.dumps(data))
     with pytest.raises(ValueError, match='partition_count_mismatch'):
+        validate_review(evaluated, report, review)
+
+
+def test_missing_actual_provenance_gate_prevents_human_approval(tmp_path):
+    evaluated, report, review = fixture_files(tmp_path)
+    model = json.loads(evaluated.read_text(encoding="utf-8"))
+    model["provenance_check"] = {"status": "synthetic_software_test_only"}
+    evaluated.write_text(json.dumps(model), encoding="utf-8")
+    with pytest.raises(ValueError, match="real_data_provenance_or_calibration_review_missing"):
+        validate_review(evaluated, report, review)
+
+
+def test_heldout_bearing_matrix_conflict_blocks_review(tmp_path):
+    evaluated, report, review = fixture_files(tmp_path)
+    model = json.loads(evaluated.read_text(encoding="utf-8"))
+    model["heldout_evaluation"]["heldout_bearing_confusion_matrix"] = [[2, 0], [0, 1]]
+    evaluated.write_text(json.dumps(model), encoding="utf-8")
+    data = json.loads(report.read_text(encoding="utf-8"))
+    data["heldout_bearing_confusion_matrix"] = [[2, 0], [0, 1]]
+    report.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="heldout_bearing_count_mismatch"):
         validate_review(evaluated, report, review)

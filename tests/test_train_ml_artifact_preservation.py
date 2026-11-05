@@ -36,10 +36,10 @@ def test_rerun_preserves_both_existing_evaluation_files(tmp_path):
     source = tmp_path / 'synthetic.csv'
     synthetic_input(source)
     output = tmp_path / 'evaluation'
-    train(source, output)
+    train(source, output, test_fixture_only=True)
     before = {p.name: p.read_bytes() for p in output.iterdir()}
     with pytest.raises(ValueError, match='evaluation_artifacts_already_exist'):
-        train(source, output)
+        train(source, output, test_fixture_only=True)
     assert {p.name: p.read_bytes() for p in output.iterdir()} == before
 
 
@@ -52,7 +52,7 @@ def test_single_existing_artifact_blocks_write(tmp_path, name):
     target = output / name
     target.write_text('DO_NOT_TOUCH', encoding='utf-8')
     with pytest.raises(ValueError, match='evaluation_artifacts_already_exist'):
-        train(source, output)
+        train(source, output, test_fixture_only=True)
     assert target.read_text(encoding='utf-8') == 'DO_NOT_TOUCH'
     assert len(list(output.iterdir())) == 1
 
@@ -72,5 +72,5 @@ def test_identical_measurement_different_trial_id_blocks_training(tmp_path):
         writer.writerows(records)
     target = tmp_path / 'evaluation'
     with pytest.raises(ValueError, match='duplicate_recording_features_for_asset'):
-        train(source, target)
+        train(source, target, test_fixture_only=True)
     assert not target.exists()
