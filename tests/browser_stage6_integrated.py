@@ -78,7 +78,7 @@ async def run():
                 await page.locator("#triage-submit").click()
                 await page.locator("#triage-result .result-cause").first.wait_for()
                 assert await page.locator("#agent-run").is_disabled()
-                await page.locator("#integration-panel summary").click()
+                await page.locator("#integration-panel > summary").click()
 
                 await page.locator("#agent-preview").click()
                 await page.locator("#agent-preview-content:not([hidden])").wait_for()
