@@ -7,13 +7,17 @@ import pytest
 from fastapi.testclient import TestClient
 from faultmate.app import app
 from faultmate.integration import agent, ml
+from faultmate.integration.context import ContextPreviewRequest, evidence_preview
 
 
 def payload(hazard='no',case='CONV-001',consent=True):
-    return {'triage':{'case_id':case,'equipment':'컨베이어',
+    p = {'triage':{'case_id':case,'equipment':'컨베이어',
        'symptom_text':'PERSONAL_SECRET_NEVER_SEND','model_name':'PRIVATE_MACHINE_NAME',
        'alarm_text':'PRIVATE_ALARM_LOG','emergency_hazard':hazard,
        'observations':{'visible_jam':'yes'}},'consent':consent}
+    p['context_sha256'] = evidence_preview(
+        ContextPreviewRequest(triage=p['triage']))['context_sha256']
+    return p
 
 
 def valid_csv():

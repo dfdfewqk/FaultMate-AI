@@ -6,10 +6,11 @@ not arbitrary operator instructions; UI output is assembled from the local catal
 from __future__ import annotations
 import json
 import os
+import hmac
 from urllib import request as urlrequest, error as urlerror
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from faultmate.diagnostics.engine import TriageRequest
-from faultmate.integration.context import ContextPreviewRequest, evidence_preview
+from faultmate.integration.context import ContextPreviewRequest, evidence_preview, agent_context_wire
 
 ENDPOINT = 'https://api.deepseek.com/chat/completions'
 # Official 2026 API model. The old deepseek-chat name was retired in July 2026.
@@ -41,6 +42,7 @@ class AgentReviewRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     triage: TriageRequest
     consent: bool = False
+    context_sha256: str | None = Field(default=None, min_length=64, max_length=64, pattern=r'^[a-f0-9]{64}$')
 
 
 def configured() -> bool:
@@ -56,7 +58,7 @@ class _BlockProviderRedirects(urlrequest.HTTPRedirectHandler):
 
 def _invoke_deepseek(context: dict, api_key: str) -> dict:
     # An unexpectedly large local context must not be shipped to a paid API.
-    context_wire = json.dumps(context, ensure_ascii=False)
+    context_wire = agent_context_wire(context)
     if len(context_wire.encode("utf-8")) > 64 * 1024:
         raise ValueError("agent_context_too_large")
     body = json.dumps({'model':MODEL,'thinking':{'type':'disabled'},'messages':[
@@ -112,6 +114,12 @@ def review(payload: AgentReviewRequest) -> dict:
         return {**basic,'status':'blocked','message':'긴급 위험 또는 사례 미선택으로 AI 검토가 차단되었습니다.'}
     if not payload.consent:
         return {**basic,'status':'consent_required','message':'매 요청마다 외부 전송에 동의해야 합니다.'}
+    # Bind the reviewed preview to the *exact* evidence sent to the provider.
+    # The Boolean consent is still mandatory; a digest does not prove consent.
+    if (not payload.context_sha256
+        or not hmac.compare_digest(payload.context_sha256, preview['context_sha256'])):
+        return {**basic,'status':'preview_mismatch',
+                'message':'미리보기 내용이 변경되었거나 확인되지 않았습니다. 다시 확인하고 동의해 주세요.'}
     key = os.environ.get('DEEPSEEK_API_KEY','').strip()
     if not key:
         return {**basic,'status':'unavailable','message':'DeepSeek API 키가 설정되지 않아 로컬 진단만 이용할 수 있습니다.'}

@@ -6,10 +6,11 @@ from fastapi.testclient import TestClient
 
 from faultmate.app import app
 from faultmate.integration import agent
+from faultmate.integration.context import ContextPreviewRequest, evidence_preview
 
 
 def selected_case(consent=True):
-    return {
+    payload = {
         "triage": {
             "case_id": "CONV-001",
             "equipment": "컨베이어",
@@ -21,6 +22,9 @@ def selected_case(consent=True):
         },
         "consent": consent,
     }
+    payload["context_sha256"] = evidence_preview(
+        ContextPreviewRequest(triage=payload["triage"]))["context_sha256"]
+    return payload
 
 
 class FakeResponse:

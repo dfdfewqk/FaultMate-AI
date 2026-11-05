@@ -221,6 +221,7 @@
   let agentRequestController = null;
   let agentPreviewVersion = 0;
   let lastPreviewVersion = -1;
+  let agentReviewedContextHash = null;
   const syncTriageButton = () => {
     triageSubmit.disabled = !triageOptions || !triageCase.value || triageHazard.value === 'yes' || !!activeTriageController;
     demoButton.disabled = !triageOptions || triageHazard.value === 'yes';
@@ -705,12 +706,13 @@
     if (!agentRun || !agentConsent) return;
     agentPreviewButton.disabled = triageHazard.value === 'yes';
     agentRun.disabled = !triageCase.value || !triageOptions || demoMode || triageHazard.value === 'yes' ||
-      !agentConsent.checked || lastPreviewVersion !== agentPreviewVersion || !!agentRequestController;
+      !agentConsent.checked || !agentReviewedContextHash || lastPreviewVersion !== agentPreviewVersion || !!agentRequestController;
   }
   function invalidateAgentReview() {
     if (!agentConsent || !agentRun) return;
     ++agentPreviewVersion;
     lastPreviewVersion = -1;
+    agentReviewedContextHash = null;
     if (agentRequestController) { agentRequestController.abort(); agentRequestController = null; }
     agentPreviewContent.hidden = true;
     agentPreviewContent.textContent = '';
@@ -726,6 +728,7 @@
     }
     const version = ++agentPreviewVersion;
     lastPreviewVersion = -1;
+    agentReviewedContextHash = null;
     agentConsent.checked = false;
     agentPreviewContent.hidden = true;
     agentPreviewContent.textContent = '';
@@ -742,6 +745,8 @@
       const data = await response.json();
       if (version !== agentPreviewVersion || triageHazard.value === 'yes' || demoMode) return;
       if (data.state !== 'candidate_review' || data.allowed_for_agent_reasoning !== true) throw new Error('preview_blocked');
+      if (typeof data.context_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(data.context_sha256)) throw new Error('preview_fingerprint_invalid');
+      agentReviewedContextHash = data.context_sha256;
       agentPreviewContent.textContent = JSON.stringify(data.context, null, 2);
       agentPreviewContent.hidden = false;
       lastPreviewVersion = agentPreviewVersion;
@@ -750,7 +755,7 @@
     } catch (_e) {
       if (version !== agentPreviewVersion) return;
       agentFeedback.textContent = '전송 예정 자료를 생성하지 못했습니다. AI 사용은 차단됩니다.';
-      lastPreviewVersion = -1; syncAgentButton();
+      lastPreviewVersion = -1; agentReviewedContextHash = null; syncAgentButton();
     }
   });
   agentRun.addEventListener('click', async () => {
@@ -764,7 +769,7 @@
     try {
       const response = await fetch('/api/agent/review', {method:'POST',
         headers:{'Content-Type':'application/json'},cache:'no-store',signal:controller.signal,
-        body:JSON.stringify({triage:currentPayload(),consent:true})});
+        body:JSON.stringify({triage:currentPayload(),consent:true,context_sha256:agentReviewedContextHash})});
       if (!response.ok) throw new Error('agent_unavailable');
       const result = await response.json();
       if (version !== agentPreviewVersion || triageHazard.value === 'yes' || controller.signal.aborted) return;
@@ -793,7 +798,7 @@
       if (version === agentPreviewVersion) {
         agentRequestController = null;
         agentConsent.checked = false;
-        lastPreviewVersion = -1; syncAgentButton();
+        lastPreviewVersion = -1; agentReviewedContextHash = null; syncAgentButton();
       }
     }
   });
