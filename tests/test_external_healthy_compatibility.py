@@ -21,7 +21,7 @@ def _inventory():
     return json.loads(SOURCE_FILE.read_text(encoding="utf-8"))
 
 
-def test_research_model_rejects_all_three_source_metadata_candidates():
+def test_research_model_rejects_all_four_source_metadata_candidates():
     status = assess_inventory()
     assert status["no_approved_healthy_source"] is True
     assert status["new_healthy_bearings_validated"] == 0
@@ -31,7 +31,7 @@ def test_research_model_rejects_all_three_source_metadata_candidates():
     assert load_validated_model() is None
     result = {r["source_id"]: r for r in status["results"]}
     assert set(result) == {"paderborn_healthy_reuse", "kaist_varying_load",
-                           "kaist_varying_speed"}
+                           "kaist_varying_speed", "phm24_bjtu_rao_bogie"}
     assert all(not r["direct_frozen_model_prediction_allowed"]
                and not r["healthy_specificity_measured"]
                and not r["new_independent_healthy_qualification"]
@@ -116,3 +116,57 @@ def test_external_research_report_no_overwrite_and_no_unapproved_ml_load(tmp_pat
     assert status["source_metadata_not_original_recording_evidence"] is True
     assert not any(x.get("score") for x in status["results"])
     assert load_validated_model() is None
+
+
+
+def test_railway_phm24_64k_both_sensors_is_still_unproven_as_paderborn_normal():
+    row = next(r for r in _inventory()["candidates"]
+               if r["source_id"] == "phm24_bjtu_rao_bogie")
+    assert row["nominal_sample_rate_vibration_hz"] == 64000
+    assert row["nominal_sample_rate_current_hz"] == 64000
+    assert row["operating_condition_count"] == 9
+    assert row["matched_paderborn_condition_protocol"] is False
+    assert row["original_download_and_usage_terms_verified"] is False
+    assert row["physical_healthy_asset_ids"] is None
+    assert row["license"] == "not_verified_for_source_data"
+    result = {x["source_id"]: x for x in assess_inventory()["results"]}[
+        "phm24_bjtu_rao_bogie"
+    ]
+    assert result["direct_frozen_model_prediction_allowed"] is False
+    assert "four_paderborn_operating_conditions_not_equivalent" in result["blocking_reasons"]
+    assert "phm24_and_bjtu_rao_benchmark_overlap_not_audited" in result["blocking_reasons"]
+    assert "source_data_usage_license_and_release_access_unverified" in result["blocking_reasons"]
+    assert "vibration_sampling_rate_differs_from_paderborn_64khz" not in result["blocking_reasons"]
+    assert "current_sampling_rate_differs_from_paderborn_64khz" not in result["blocking_reasons"]
+
+
+@pytest.mark.parametrize("field,fake", [
+    ("nominal_sample_rate_vibration_hz", 25600),
+    ("operating_condition_count", 4),
+    ("matched_paderborn_condition_protocol", True),
+    ("license", "CC BY 4.0"),
+    ("physical_healthy_asset_ids", ["UNPROVEN-NEW"]),
+    ("independent_physical_asset_inventory_verified", True),
+    ("source_archive_integrity_verified", True),
+    ("source_raw_signal_integrity_verified", True),
+    ("other_domain_equivalence_reviewed", True),
+    ("original_download_and_usage_terms_verified", True),
+    ("additional_evidence_url", "https://malicious.example"),
+])
+def test_phm24_public_metadata_cannot_fabricate_origins_or_originals(field, fake):
+    doc = copy.deepcopy(_inventory())
+    row = next(r for r in doc["candidates"]
+               if r["source_id"] == "phm24_bjtu_rao_bogie")
+    row[field] = fake
+    with pytest.raises(SourceReadinessError):
+        _validate_fixed_source_inventory(doc)
+
+
+def test_phm24_or_kaist_public_sources_never_yield_new_normal_specificity():
+    data = assess_inventory()
+    assert data["new_healthy_bearings_validated"] == 0
+    assert data["false_positive_rate_measured"] is False
+    assert data["overall_accuracy_measured"] is False
+    assert data["ml_predictions_performed"] is False
+    assert len(data["results"]) == 4
+    assert all(not row["new_independent_healthy_qualification"] for row in data["results"])
