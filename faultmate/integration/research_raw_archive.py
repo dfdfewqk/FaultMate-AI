@@ -12,6 +12,7 @@ non-sensitive research metadata, not raw signals or full feature vectors.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import shutil
 import tempfile
@@ -20,7 +21,6 @@ from pathlib import Path
 
 from fastapi import HTTPException, Request
 from scripts.audit_paderborn_assets import CATALOG, validate_catalog
-from scripts.run_experimental_paderborn_ml import run_archive
 
 MAX_ORIGINAL_RAR_BYTES = 768 * 1024 * 1024
 MIN_EXTRA_DISK_BYTES = 256 * 1024 * 1024
@@ -34,7 +34,7 @@ def validate_bearing_id(raw_id: str | None) -> str:
     if not isinstance(raw_id, str) or not READABLE_BEARING.fullmatch(raw_id):
         raise HTTPException(status_code=422, detail="supported_original_bearing_id_required")
     if raw_id not in {a["id"] for a in validate_catalog(
-        __import__("json").loads(CATALOG.read_text(encoding="utf-8"))
+        json.loads(CATALOG.read_text(encoding="utf-8"))
     )}:
         raise HTTPException(status_code=422, detail="only_original_paderborn_12_bearings_supported")
     return raw_id
@@ -76,6 +76,7 @@ def _research_score(archive: Path, asset: str) -> dict:
             "confirmed_fault": False, "safe_to_work": False,
             "message": "원본 RAR을 읽는 7-Zip 실행 도구가 없어 분석을 시작하지 못했습니다.",
         }
+    from scripts.run_experimental_paderborn_ml import run_archive
     score = run_archive(archive, asset, sevenzip=sevenzip)
     return {
         "status": "experimental_unapproved",
@@ -140,7 +141,8 @@ async def inspect_original_rar(request: Request) -> dict:
             # responsive during expensive original MAT processing.
             try:
                 return await asyncio.to_thread(_research_score, archive, asset)
-            except (OSError, ValueError, TypeError, KeyError, RuntimeError):
+            except (OSError, ValueError, TypeError, KeyError, RuntimeError,
+                    ImportError, ModuleNotFoundError):
                 # Do not echo temporary path, source bytes, archive exception
                 # internals, or the original filename into browser/log output.
                 return {
