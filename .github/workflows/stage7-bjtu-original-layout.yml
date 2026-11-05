@@ -181,6 +181,7 @@ jobs:
           assert d["source_csv_sha256_verified"] is False
           assert d["independent_normal_physical_bearings_verified"] == 0
           assert d["metadata_listing_complete"] is False
+          print("PUBLIC_DRIVE_PUBLIC_RELATIVE_PATHS_NO_IDS", d.get("public_entry_path_sample", [])[:25])
           print("PUBLIC_DRIVE_METADATA_PROBE_NO_MODEL_OR_DATA_TRANSFER", {
               "reachable":d["google_drive_folder_reachable"],
               "metadata_entries_returned":d["metadata_entries_returned"],
