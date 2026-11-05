@@ -30,6 +30,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
+# Running this script directly from tests/ does not put the repository's
+# scripts/ package on sys.path; keep source fixtures and production isolated.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def available_local_port() -> int:
@@ -141,11 +145,32 @@ async def exercise_real_windows_chromium(base: str) -> dict:
             assert "모델이 없으므로" in await page.locator("#ml-feedback").inner_text()
             assert not (await page.locator("#ml-result").inner_text()).strip()
 
+            # Separate EXPERIMENTAL ML path: synthetic 4x20 unitless features
+            # exercise a real model score in the actual Windows web browser.
+            # This fixture is NOT independently verified original sensor data;
+            # the real original K001 source is checked by its own CI job.
+            from test_experimental_paderborn_real_inference import fake_source_feature_report
+            await page.locator("#research-upload").set_input_files({
+                "name": "synthetic_80_record_research.json",
+                "mimeType": "application/json",
+                "buffer": json.dumps(fake_source_feature_report()).encode("utf-8"),
+            })
+            assert await page.locator("#research-run").is_enabled()
+            await page.locator("#research-run").click()
+            await page.wait_for_function(
+                "document.querySelector('#research-result').textContent.includes('미승인 실험 결과')")
+            research_text = await page.locator("#research-result").inner_text()
+            assert "손상 판별 점수" in research_text
+            assert "원본 측정파일의 진위를 검증할 수 없습니다" in research_text
+            assert "현장 고장 확률" in research_text
+
             # Safety-hold must hide stale results and disable both optional AI/ML.
             await page.locator("#triage-hazard").select_option("yes")
             assert await page.locator("#agent-preview").is_disabled()
             assert await page.locator("#agent-run").is_disabled()
             assert await page.locator("#ml-run").is_disabled()
+            assert await page.locator("#research-run").is_disabled()
+            assert not (await page.locator("#research-result").inner_text()).strip()
             assert "긴급 위험 징후" in await page.locator("#triage-result").inner_text()
 
             await page.locator("#knowledge-panel summary").click()
@@ -159,6 +184,8 @@ async def exercise_real_windows_chromium(base: str) -> dict:
             assert any(method == "POST" and url.endswith("/api/agent/review")
                        for method, url in touched)
             assert any(method == "POST" and url.endswith("/api/ml/inspect")
+                       for method, url in touched)
+            assert any(method == "POST" and url.endswith("/api/ml/experimental-unitless-report")
                        for method, url in touched)
             assert all(url.startswith(base + "/") for _, url in touched), touched
             assert not issues, issues

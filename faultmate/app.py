@@ -141,6 +141,74 @@ async def ml_inspect(request: Request, response: Response):
             raise HTTPException(status_code=413, detail="csv_too_large")
     return inspect_csv(bytes(data))
 
+
+@app.post("/api/ml/experimental-unitless-report")
+async def research_unitless_report(request: Request, response: Response):
+    """Research-only scoring from 80 declared dimensionless source features.
+
+    A JSON upload is UNTRUSTED: it is NOT cryptographic proof of source MAT
+    files. Only the separate raw-RAR CLI independently checks original bytes.
+    Never mutate, train, or approve models; keep /api/ml/inspect unchanged.
+    """
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
+    limit = 512_000
+    if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
+        raise HTTPException(status_code=415, detail="research_json_required")
+    try:
+        declared = int(request.headers.get("content-length", "0"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_content_length")
+    if declared > limit:
+        raise HTTPException(status_code=413, detail="research_report_too_large")
+    raw = bytearray()
+    async for piece in request.stream():
+        raw.extend(piece)
+        if len(raw) > limit:
+            raise HTTPException(status_code=413, detail="research_report_too_large")
+    if not raw:
+        return {"status": "unsupported_input", "research_inference_performed": False,
+                "confirmed_fault": False, "safe_to_work": False,
+                "message": "실험용 특징 보고서가 비어 있습니다."}
+    try:
+        # Science dependencies are imported only for this explicit optional
+        # research action, so existing rule-based diagnosis remains independent.
+        from scripts.run_experimental_paderborn_ml import score_original_feature_report
+        import json
+        doc = json.loads(raw.decode("utf-8-sig"))
+        result = score_original_feature_report(doc)
+    except (ImportError, ModuleNotFoundError):
+        return {"status": "unavailable", "research_inference_performed": False,
+                "confirmed_fault": False, "safe_to_work": False,
+                "message": "연구용 ML 의존성 설치가 완료되지 않았습니다."}
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError,
+            OverflowError):
+        return {"status": "unsupported_input", "research_inference_performed": False,
+                "confirmed_fault": False, "safe_to_work": False,
+                "message": "검증 가능한 4조건×20회 진동·전류 특징 보고서가 아닙니다."}
+    # The upload itself can be forged, even if source MD5 string and MAT SHA
+    # strings MATCH a catalog. No API can reverify original raw RAR by JSON.
+    return {
+        "status": "experimental_unapproved",
+        "research_inference_performed": True,
+        "source_archive_reverified_from_original_bytes_this_http_request": False,
+        "uploaded_metadata_is_original_provenance_proof": False,
+        "result_may_be_from_previously_trained_bearing": True,
+        "bearing_id": result["research_input_source"]["bearing_id"],
+        "input_recordings": result["research_input_source"]["source_records"],
+        "unique_signal_pairs_reported": result["research_input_source"]["unique_signal_pairs"],
+        "experimental_predicted_label": result["experimental_predicted_label"],
+        "experimental_damage_model_score": result["experimental_damage_model_score"],
+        "frozen_model_sha256": result["frozen_model_sha256"],
+        "model_approved_for_runtime": False,
+        "new_healthy_specificity_measured": False,
+        "field_accuracy_measured": False,
+        "confirmed_fault": False,
+        "safe_to_work": False,
+        "ml_predictions_are_not_maintenance_authorization": True,
+        "message": "기존 연구용 모델의 실험 점수입니다. 업로드된 JSON만으로 원본 측정 파일은 재검증되지 않습니다. 현장 고장 확정이나 정비 허가가 아닙니다.",
+    }
+
 app.mount("/assets", StaticFiles(directory=WEB), name="web-assets")
 
 @app.get("/")

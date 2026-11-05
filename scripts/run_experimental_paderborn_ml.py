@@ -197,13 +197,24 @@ def score_original_feature_report(doc: dict) -> dict:
     }
 
 
-def run_archive(archive: Path, bearing_id: str, *, sevenzip: str) -> dict:
+def run_archive(archive: Path, bearing_id: str, *, sevenzip: str,
+                features_out: Path | None = None) -> dict:
     """Actual source MD5, archive test, 80 original MAT channels, features, ML."""
     bearing_id = bearing_id.upper()
     report = extract_archive(
         archive.absolute(), bearing_id, sevenzip=sevenzip,
     )
     result = score_original_feature_report(report)
+    if features_out is not None:
+        # Optional PRIVATE LOCAL derived feature report for the clearly
+        # labelled research-only UI. This contains no original raw waveforms,
+        # but is still source-derived evidence under CC BY-NC license.
+        if features_out.exists() or features_out.is_symlink():
+            raise SourceAuditError("research_features_output_already_exists")
+        features_out.parent.mkdir(parents=True, exist_ok=True)
+        with features_out.open("x", encoding="utf-8") as out:
+            json.dump(report, out, ensure_ascii=False, separators=(",", ":"))
+            out.write("\n")
     # Only THIS function establishes real original RAR evidence, because it
     # directly invoked extract_archive's actual source-MD5 and 80-MAT checks.
     result["source_archive_verified_from_original_bytes_same_run"] = True
@@ -218,6 +229,8 @@ def main(argv=None) -> int:
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--bearing-id", required=True)
     parser.add_argument("--sevenzip", help="Existing 7z executable")
+    parser.add_argument("--features-out", type=Path,
+                        help="Optional NEW local 80-record feature JSON for research UI, never overwrite.")
     parser.add_argument("--out", type=Path, required=True,
                         help="NEW JSON report path. Never overwrite.")
     args = parser.parse_args(argv)
@@ -230,9 +243,16 @@ def main(argv=None) -> int:
             raise SourceAuditError("sevenzip_unavailable")
         if args.out.exists() or args.out.is_symlink():
             raise SourceAuditError("research_result_already_exists_no_overwrite")
+        if args.features_out is not None:
+            if (args.features_out == args.out or
+                args.features_out.exists() or args.features_out.is_symlink()):
+                raise SourceAuditError("research_features_output_already_exists")
         # Do NOT create any output unless raw original extraction AND actual
         # model scoring both complete. Existing source RAR is never modified.
-        result = run_archive(args.archive, args.bearing_id, sevenzip=sevenzip)
+        result = run_archive(
+            args.archive, args.bearing_id, sevenzip=sevenzip,
+            **({"features_out": args.features_out} if args.features_out is not None else {})
+        )
         args.out.parent.mkdir(parents=True, exist_ok=True)
         with args.out.open("x", encoding="utf-8") as output:
             json.dump(result, output, ensure_ascii=False, indent=2)
@@ -244,6 +264,7 @@ def main(argv=None) -> int:
             "experimental_predicted_label": result["experimental_predicted_label"],
             "experimental_damage_model_score": result["experimental_damage_model_score"],
             "production_ml_approved": False,
+            "derived_research_feature_report_created": args.features_out is not None,
             "output": str(args.out),
         }, ensure_ascii=False))
         return 0
