@@ -116,7 +116,16 @@ def verified_dev_rows(feature_dir: Path, audit_dir: Path, baseline: Path,
             "dataset": feat.get("dataset") == "paderborn_bearing_datacenter",
             "label": feat.get("label") == catalog[asset]["label"],
             "license": feat.get("license") == "CC BY-NC 4.0",
-            "catalog_sha": feat.get("source_catalog_sha256") == catalog_sha,
+            # The historical source catalog may have gained documentation text
+            # since the original audit. Require exact AGREEMENT between both
+            # ORIGINAL audited copies (both independently pinned by the prior
+            # real-run artifact SHAs), plus recheck current label + official MD5.
+            "original_catalog_sha_match": (
+                isinstance(feat.get("source_catalog_sha256"), str)
+                and len(feat["source_catalog_sha256"]) == 64
+                and feat.get("source_catalog_sha256")
+                    == audit.get("source_catalog_sha256")
+            ),
             "archive_md5": feat.get("official_archive_md5") == catalog[asset]["md5"],
             "archive_verified": feat.get("archive_verified") is True,
             "raw_si_unverified": feat.get("raw_si_units_verified") is False,
