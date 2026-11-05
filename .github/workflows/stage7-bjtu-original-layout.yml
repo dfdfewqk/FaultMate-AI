@@ -188,10 +188,27 @@ jobs:
               "error_class":d.get("public_drive_error_class"),
           })
           PY
+      - name: Download and inspect ONLY tiny original-author public ReadMe (not sensor archives)
+        run: |
+          python scripts/probe_bjtu_author_readme.py \
+            --out source-review/BJTU_PUBLIC_AUTHOR_README_SUMMARY.json
+          python - <<'PY'
+          import json
+          d=json.load(open("source-review/BJTU_PUBLIC_AUTHOR_README_SUMMARY.json"))
+          assert d["no_raw_signal_csv_downloaded"] is True
+          assert d["source_normal_physical_bearings_independently_verified"] == 0
+          assert d["industrial_runtime_model_approved"] is False
+          print("ORIGINAL_PUBLIC_AUTHOR_README_SAFE_PROBE", {
+              "readme_retrieved":d["readme_retrieved"],
+              "split_parts_all_listed":d.get("split_parts_all_listed"),
+              "error_class":d.get("probe_error_class"),
+              "readme_first_lines_sanitized":d.get("readme_first_lines_sanitized", [])[:12],
+          })
+          PY
       - name: Upload tiny source-access summary only, no CSV or file IDs
         uses: actions/upload-artifact@v4
         with:
           name: bjtu-public-drive-metadata-probe-no-original-data
-          path: source-review/BJTU_PUBLIC_DRIVE_METADATA_ONLY.json
+          path: source-review/*.json
           retention-days: 7
           if-no-files-found: error
