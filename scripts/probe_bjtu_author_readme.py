@@ -19,6 +19,9 @@ import sys
 from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 
+# Direct "python scripts/..." execution otherwise omits repository root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from scripts.audit_bjtu_primary_layout import (
     DRIVE_FOLDER, PublishedSourceError, verify_published_layout,
     PUBLISHED_LAYOUT,
