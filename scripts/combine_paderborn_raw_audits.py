@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.audit_paderborn_assets import CATALOG, CONDITION, OFFICIAL_CONDITIONS, SourceAuditError, validate_catalog
 
 HEX64 = re.compile(r"[a-f0-9]{64}\Z")
+FULL_RECORDINGS = {(condition, trial) for condition in OFFICIAL_CONDITIONS for trial in range(1, 21)}
 
 
 def _digest(value: object) -> bool:
@@ -30,7 +31,15 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
         raise SourceAuditError("audit_reports_directory_missing_or_symlink")
     catalog_data = catalog_path.read_bytes()
     official = {row["id"]: row for row in validate_catalog(json.loads(catalog_data))}
-    catalog_digest = hashlib.sha256(catalog_data).hexdigest()
+    # Windows checkout may produce CRLF while Linux uses LF for the SAME JSON.
+    # Accept ONLY hashes of these two line-ending representations of the
+    # repository-pinned catalog, never arbitrary metadata or unknown variants.
+    catalog_lf = catalog_data.replace(b"\r\n", b"\n")
+    catalog_digest = hashlib.sha256(catalog_lf).hexdigest()
+    permitted_catalog_digests = {
+        catalog_digest,
+        hashlib.sha256(catalog_lf.replace(b"\n", b"\r\n")).hexdigest(),
+    }
     files = sorted(reports_dir.glob("*.json"))
     if not files:
         raise SourceAuditError("no_raw_audit_reports")
@@ -41,6 +50,9 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
     fingerprints: dict[str, tuple[str, str]] = {}
     duplicates = []
     counts = Counter()
+    complete_counts = Counter()
+    incomplete_recording_audits = []
+    mat_digest_fingerprints: dict[str, str] = {}
     data_files = 0
 
     for path in files:
@@ -56,7 +68,7 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
         if (report.get("status") != "source_verified_raw_units_unapproved"
             or report.get("source_md5_verified") is not True
             or report.get("source_archive_md5") != source["md5"]
-            or report.get("source_catalog_sha256") != catalog_digest
+            or report.get("source_catalog_sha256") not in permitted_catalog_digests
             or type(report.get("source_archive_size_bytes")) is not int
             or report["source_archive_size_bytes"] < 100_000_000
             or report.get("archive_inventory_verified") != "80_mat_files_across_4_conditions"
@@ -107,6 +119,9 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
                     raise SourceAuditError("invalid_unscaled_signal_metric")
             if record["raw_peak_abs_vibration_unscaled"] + 1e-10 < record["raw_rms_vibration_unscaled"]:
                 raise SourceAuditError("raw_peak_smaller_than_rms")
+            mat_fingerprint = mat_digest_fingerprints.setdefault(record["mat_sha256"], fingerprint)
+            if mat_fingerprint != fingerprint:
+                raise SourceAuditError("same_mat_sha256_different_raw_fingerprint")
             if fingerprint in fingerprints and fingerprints[fingerprint][0] != bearing:
                 raise SourceAuditError("identical_raw_signal_across_bearings")
             fingerprints.setdefault(fingerprint, (bearing, name))
@@ -120,14 +135,27 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
         if (report.get("unique_raw_signals") != len(local_first)
             or report.get("duplicate_raw_recordings") != expected_duplicates):
             raise SourceAuditError("duplicate_summary_invalid")
+        observed = {(CONDITION.fullmatch(name).group(1).upper(),
+                     int(CONDITION.fullmatch(name).group(3))) for name in local_names}
+        if observed == FULL_RECORDINGS and len(recordings) == 80:
+            complete_counts[source["label"]] += 1
+        else:
+            incomplete_recording_audits.append(bearing)
         duplicates.extend({"bearing_id": bearing, **item} for item in expected_duplicates)
         data_files += len(recordings)
         counts[source["label"]] += 1
         seen_assets.add(bearing)
 
     missing = sorted(set(official) - seen_assets)
+    incomplete = sorted(incomplete_recording_audits)
+    full_cohort = not missing and not incomplete
     return {
-        "status": "raw_audit_partial" if missing else "raw_archives_audited_calibration_unverified",
+        "status": "raw_archives_audited_calibration_unverified" if full_cohort else "raw_audit_partial",
+        "cohort_raw_audit_complete": full_cohort,
+        "recording_inventory_expected": len(official) * len(FULL_RECORDINGS),
+        "fully_audited_bearings": sum(complete_counts.values()),
+        "fully_audited_by_label": {key: complete_counts[key] for key in ("healthy", "damaged")},
+        "bearings_with_incomplete_recordings": incomplete,
         "source_catalog_sha256": catalog_digest,
         "verified_independent_bearings": len(seen_assets),
         "verified_by_label": {key: counts[key] for key in ("healthy", "damaged")},
@@ -135,7 +163,7 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
         "inspected_recordings": data_files,
         "duplicate_raw_recordings": duplicates,
         "unique_raw_signals_in_inspected_recordings": len(fingerprints),
-        "minimum_bearing_counts_met": counts["healthy"] >= 5 and counts["damaged"] >= 5,
+        "minimum_bearing_counts_met": complete_counts["healthy"] >= 5 and complete_counts["damaged"] >= 5,
         "physical_units_verified": False,
         "si_csv_generated": False,
         "model_trained": False,
