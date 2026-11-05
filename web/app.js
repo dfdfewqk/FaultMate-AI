@@ -860,7 +860,7 @@
       }
     }
   });
-}  const researchInput = document.getElementById('research-upload');
+  const researchInput = document.getElementById('research-upload');
   const researchRun = document.getElementById('research-run');
   const researchFeedback = document.getElementById('research-feedback');
   const researchResult = document.getElementById('research-result');
