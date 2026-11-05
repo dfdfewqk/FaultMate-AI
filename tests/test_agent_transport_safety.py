@@ -127,3 +127,130 @@ def test_extra_large_provider_content_rejected(monkeypatch):
     monkeypatch.setattr(agent.urlrequest, "build_opener", lambda *args: Opener())
     with pytest.raises(ValueError, match="invalid_upstream_json_content"):
         agent._invoke_deepseek({"case_id": "CONV-001"}, "FAKE_SECRET")
+
+
+def test_2026_official_model_and_json_format_no_thinking_or_extra_tools(monkeypatch):
+    """Only one bounded, current DeepSeek Flash chat request is constructed."""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "SYNTHETIC_TEST_KEY")
+    seen = []
+    class Opener:
+        def open(self, req, timeout=None):
+            assert timeout == 20
+            body = json.loads(req.data)
+            assert body["model"] == "deepseek-flash"
+            assert body["thinking"] == {"type": "disabled"}
+            assert body["response_format"] == {"type": "json_object"}
+            assert body["stream"] is False
+            assert body["max_tokens"] == 600
+            assert "tools" not in body
+            assert len(body["messages"]) == 2
+            assert "JSON" in body["messages"][0]["content"]
+            seen.append(body)
+            return FakeResponse(json.dumps({
+                "candidate_order": [0], "question_indices": []
+            }))
+    monkeypatch.setattr(agent.urlrequest, "build_opener", lambda *args: Opener())
+    with TestClient(app) as client:
+        out = client.post("/api/agent/review", json=selected_case()).json()
+    assert out["status"] == "reviewed"
+    assert len(seen) == 1  # Never automatic multiple billed calls.
+    assert out["safe_to_work"] is False
+
+
+@pytest.mark.parametrize("http_code,expected", [
+    (400, "provider_request_rejected"),
+    (401, "provider_authentication_failed"),
+    (402, "provider_insufficient_balance"),
+    (422, "provider_request_rejected"),
+    (429, "provider_rate_limited"),
+    (500, "provider_server_error"),
+    (503, "provider_overloaded"),
+])
+def test_provider_http_errors_fail_closed_without_retry_or_leak(
+    monkeypatch, http_code, expected
+):
+    from urllib.error import HTTPError
+    secret = "NEVER_EXPOSE_FAKE_KEY"
+    monkeypatch.setenv("DEEPSEEK_API_KEY", secret)
+    calls = []
+    class Opener:
+        def open(self, req, timeout=None):
+            calls.append((req, timeout))
+            raise HTTPError(agent.ENDPOINT, http_code, "SENSITIVE_PROVIDER_MESSAGE", None, None)
+    monkeypatch.setattr(agent.urlrequest, "build_opener", lambda *args: Opener())
+    with TestClient(app) as client:
+        response = client.post("/api/agent/review", json=selected_case()).json()
+        local = client.post("/api/diagnostics/evaluate", json=selected_case()["triage"])
+    assert len(calls) == 1
+    assert response["status"] == "error" and response["error_code"] == expected
+    assert response["external_transfer_performed"] is None
+    assert response["external_transfer_attempted"] is True
+    assert response["agent_review"] is None
+    assert response["safe_to_work"] is False
+    assert local.status_code == 200
+    exposed = json.dumps(response)
+    assert secret not in exposed and "SENSITIVE_PROVIDER_MESSAGE" not in exposed
+
+
+@pytest.mark.parametrize("exception,code", [
+    (TimeoutError("SENSITIVE_TIMEOUT_DETAIL"), "provider_timeout"),
+    (__import__("urllib.error", fromlist=["URLError"]).URLError("SENSITIVE_SOCKET_DETAIL"),
+     "provider_network_error"),
+])
+def test_transport_timeout_and_network_failure_are_not_retried(
+    monkeypatch, exception, code
+):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "NEVER_SHOW_KEY")
+    calls = []
+    class Opener:
+        def open(self, req, timeout=None):
+            calls.append(req)
+            raise exception
+    monkeypatch.setattr(agent.urlrequest, "build_opener", lambda *args: Opener())
+    with TestClient(app) as client:
+        response = client.post("/api/agent/review", json=selected_case()).json()
+    assert len(calls) == 1
+    assert response["status"] == "error" and response["error_code"] == code
+    assert response["external_transfer_performed"] is None
+    assert response["safe_to_work"] is False
+    assert "NEVER_SHOW_KEY" not in json.dumps(response)
+    assert "SENSITIVE" not in json.dumps(response)
+
+
+@pytest.mark.parametrize("finish_reason,content", [
+    ("length", '{"candidate_order":[0]}'),
+    ("content_filter", '{"candidate_order":[0]}'),
+    ("stop", "    "),  # JSON mode can return spaces rather than valid JSON
+    ("stop", '{"candidate_order":[true],"question_indices":[]}'),
+    ("stop", '{"candidate_order":[0,0],"question_indices":[]}'),
+])
+def test_unsafe_partial_or_malformed_json_provider_output_rejected(
+    monkeypatch, finish_reason, content
+):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "TEST_ONLY")
+    class Opener:
+        def open(self, req, timeout=None):
+            result = {
+                "choices": [{
+                    "finish_reason": finish_reason,
+                    "message": {"content": content},
+                }]
+            }
+            return _ByteResponse(json.dumps(result).encode("utf-8"))
+    monkeypatch.setattr(agent.urlrequest, "build_opener", lambda *args: Opener())
+    with TestClient(app) as client:
+        output = client.post("/api/agent/review", json=selected_case()).json()
+    assert output["status"] == "error"
+    assert output["agent_review"] is None
+    assert output["safe_to_work"] is False
+
+
+class _ByteResponse:
+    def __init__(self, data):
+        self.data = data
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        return False
+    def read(self, size):
+        return self.data[:size]
