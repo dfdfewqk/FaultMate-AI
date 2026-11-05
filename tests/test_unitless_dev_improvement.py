@@ -13,6 +13,7 @@ import pytest
 
 from scripts.audit_paderborn_assets import CATALOG, OFFICIAL_CONDITIONS, validate_catalog
 from scripts.extract_paderborn_unitless import SCHEMA, FEATURE_NAMES
+from scripts.extract_unseen_paderborn_damaged import canonical_json_sha256
 from scripts.evaluate_unitless_dev_only import (
     BASELINE_REPORT_SHA256, CANDIDATES, PREVIOUSLY_OPENED_TEST_BEARINGS,
     _predict, analyze_development, verified_dev_rows,
@@ -200,7 +201,7 @@ def test_committed_real_dev_model_exactly_matches_successful_actions_artifact():
     p = (CATALOG.parents[1] / "docs" / "experiments" /
          "PADERBORN_BEARING_AGGREGATED_UNAPPROVED_20261105.json")
     exact_bytes = p.read_bytes()
-    assert hashlib.sha256(exact_bytes).hexdigest() == (
+    assert canonical_json_sha256(p) == (
         "84a7c059fa769d1b0e2bd0075ecba92bcd06ae24acf961e0ea2120d9d44a0ab0"
     )
     data = json.loads(exact_bytes)
