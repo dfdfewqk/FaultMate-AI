@@ -12,7 +12,9 @@ import json
 import math
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 from scipy.io import loadmat
@@ -99,13 +101,32 @@ def choose(channels, names):
     raise ValueError(f"missing_required_channel:{'/'.join(names)}")
 
 
-def verify_units(path: Path, vibration, current, manifest_path: Path | None):
+def verify_units(path: Path, vibration, current, manifest_path: Path | None,
+                 evidence_document: Path | None = None):
+    """Return (evidence, vibration-to-SI multiplier, current-to-SI multiplier).
+
+    Empty Unit fields can only be overridden with a source-MAT-bound calibration
+    review and a *local evidence document* whose SHA-256 is pinned. A sensor
+    model or an arbitrary review note alone is NOT calibration evidence.
+
+    This validates the human review trail, not the factual truth of the document.
+    """
     units = (vibration["unit"], current["unit"])
-    if units == ("m/s²", "A") or units == ("m/s^2", "A"):
-        return "mat_metadata"
+    if units in (("m/s²", "A"), ("m/s^2", "A")):
+        return "mat_metadata", 1.0, 1.0
     if not manifest_path:
         raise ValueError("unit_metadata_missing_or_unsupported; provide reviewed --unit-manifest")
+    if evidence_document is None:
+        raise ValueError("unit_evidence_document_required")
+    if evidence_document.is_symlink() or not evidence_document.is_file():
+        raise ValueError("unit_evidence_document_missing_or_symlink")
+    if evidence_document.suffix.lower() not in (".pdf", ".txt", ".md", ".eml"):
+        raise ValueError("unit_evidence_document_type_not_supported")
+    if not 100 <= evidence_document.stat().st_size <= 20_000_000:
+        raise ValueError("unit_evidence_document_size_invalid")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("unit_manifest_must_be_object")
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if manifest.get("source_sha256") != actual:
         raise ValueError("unit_manifest_source_hash_mismatch")
@@ -113,12 +134,49 @@ def verify_units(path: Path, vibration, current, manifest_path: Path | None):
         raise ValueError("unit_manifest_channel_mismatch")
     if manifest.get("vibration_unit") not in ("m/s²", "m/s^2") or manifest.get("current_unit") != "A":
         raise ValueError("unit_manifest_units_not_si")
-    evidence = manifest.get("unit_evidence")
-    if not isinstance(evidence, str) or len(evidence.strip()) < 12:
-        raise ValueError("unit_manifest_evidence_missing")
-    # A human still must verify that the cited source truly establishes these units.
-    return evidence.strip()
-
+    if manifest.get("evidence_document_sha256") != hashlib.sha256(evidence_document.read_bytes()).hexdigest():
+        raise ValueError("unit_evidence_document_hash_mismatch")
+    if manifest.get("stored_mat_values_calibration_verified") is not True:
+        raise ValueError("stored_numeric_calibration_not_verified")
+    if manifest.get("evidence_type") not in ("primary_dataset_documentation", "dataset_author_confirmation"):
+        raise ValueError("dataset_specific_evidence_required")
+    url = manifest.get("evidence_url")
+    if not isinstance(url, str) or urlparse(url).scheme != "https" or not urlparse(url).hostname:
+        raise ValueError("unit_evidence_source_url_required")
+    # The review must explain the numerical scaling of values in the *stored*
+    # MAT channels, not just quote the model/sensitivity of a sensor.
+    explanation = manifest.get("unit_evidence")
+    if not isinstance(explanation, str) or len(explanation.strip()) < 40:
+        raise ValueError("unit_evidence_specific_explanation_required")
+    location = manifest.get("evidence_location")
+    if not isinstance(location, str) or len(location.strip()) < 3:
+        raise ValueError("unit_evidence_page_or_section_required")
+    reviewer = manifest.get("reviewed_by")
+    if not isinstance(reviewer, str) or len(reviewer.strip()) < 2:
+        raise ValueError("independent_reviewer_required")
+    stamp = manifest.get("reviewed_utc")
+    try:
+        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            raise ValueError()
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError("dated_calibration_review_required") from exc
+    factors = []
+    for name in ("vibration_scale_to_m_s2", "current_scale_to_a"):
+        raw = manifest.get(name)
+        if type(raw) not in (int, float) or not math.isfinite(raw) or raw <= 0:
+            raise ValueError("invalid_calibration_scale:" + name)
+        factors.append(float(raw))
+    # Do not accept a reviewer overriding a *known* incompatible MAT unit.
+    if vibration["unit"] not in ("", "unknown", "V", "mV", "g", "m/s²", "m/s^2"):
+        raise ValueError("unsupported_vibration_mat_unit")
+    if current["unit"] not in ("", "unknown", "V", "mV", "A"):
+        raise ValueError("unsupported_current_mat_unit")
+    if vibration["unit"] in ("m/s²", "m/s^2") and factors[0] != 1.0:
+        raise ValueError("vibration_si_metadata_scale_conflict")
+    if current["unit"] == "A" and factors[1] != 1.0:
+        raise ValueError("current_si_metadata_scale_conflict")
+    return explanation.strip(), factors[0], factors[1]
 
 def as_signal(item):
     values = np.asarray(item["values"])
@@ -158,8 +216,14 @@ def convert(args):
         raise ValueError("asset_id_does_not_match_recording_filename")
     vib = choose(channels, VIBRATION)
     cur = choose(channels, CURRENT)
-    unit_evidence = verify_units(file, vib, cur, Path(args.unit_manifest) if args.unit_manifest else None)
-    vibration, current = as_signal(vib), as_signal(cur)
+    unit_evidence, vibration_scale, current_scale = verify_units(
+        file, vib, cur,
+        Path(args.unit_manifest) if args.unit_manifest else None,
+        Path(args.unit_evidence_document) if getattr(args, "unit_evidence_document", None) else None,
+    )
+    vibration, current = as_signal(vib) * vibration_scale, as_signal(cur) * current_scale
+    if not np.all(np.isfinite(vibration)) or not np.all(np.isfinite(current)):
+        raise ValueError("invalid_calibrated_signal")
     if vibration.size != current.size:
         raise ValueError("signal_sample_count_mismatch")
     vibration_rms = math.sqrt(float(np.mean(vibration * vibration)))
@@ -188,7 +252,8 @@ def main():
     parser.add_argument("--label", choices=("healthy", "damaged"))
     parser.add_argument("--label-provenance")
     parser.add_argument("--license", default=PADERBORN_LICENSE)
-    parser.add_argument("--unit-manifest", help="Reviewed SHA256-bound units + documentary evidence")
+    parser.add_argument("--unit-manifest", help="MAT-bound human calibration review JSON (not proof by itself)")
+    parser.add_argument("--unit-evidence-document", help="Locally stored primary calibration document or author response, hash-bound to review")
     parser.add_argument("--output")
     args = parser.parse_args()
     try:

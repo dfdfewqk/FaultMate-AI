@@ -1,0 +1,57 @@
+name: Integrated official KA04 raw provenance gate (NO model or distribution)
+on:
+  push:
+    branches:
+      - work/faultmate-final-integration-20261105
+    paths:
+      - .github/workflows/ka04-integrated-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-actual-ka04:
+    runs-on: windows-2025
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install MATLAB reader only
+        shell: pwsh
+        run: |
+          python -m pip install scipy numpy
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fetch official source to isolated temporary CI path
+        shell: pwsh
+        run: |
+          $url = 'https://zenodo.org/records/15845309/files/KA04.rar?download=1'
+          $dest = Join-Path $env:RUNNER_TEMP 'KA04.rar'
+          & curl.exe --fail --location --retry 2 --connect-timeout 25 --max-time 440 --show-error --silent $url --output $dest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Re-verify raw channels, archive provenance and cross-asset audit safety gate
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path audit-reports | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP 'KA04.rar'
+          python scripts/audit_paderborn_raw_recordings.py --archive $archive --bearing-id KA04 --trials 17 18 --out audit-reports/KA04.json > $null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/combine_paderborn_raw_audits.py --reports-dir audit-reports --out ka04-cohort-readiness.json > $null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content audit-reports/KA04.json -Raw | ConvertFrom-Json
+          $combined = Get-Content ka04-cohort-readiness.json -Raw | ConvertFrom-Json
+          if ($report.inspected_recordings -ne 8 -or $report.unique_raw_signals -ne 7) { throw 'Unexpected actual KA04 measurements' }
+          if ($report.duplicate_raw_recordings.Count -ne 1) { throw 'Known duplicate not preserved' }
+          if ($combined.verified_independent_bearings -ne 1 -or $combined.bearings_missing_audit.Count -ne 11) { throw 'Incomplete cohort wrongly declared ready' }
+          if ($combined.training_permitted -ne $false -or $combined.model_trained -ne $false -or $combined.physical_units_verified -ne $false) { throw 'Unsafe model readiness claim' }
+          Write-Output 'KA04_AGGREGATION_PASS: real source MD5, 8 recordings, 7 unique signals, 1 duplicate, 11 assets unaudited, SI/model blocked'
+      - name: Upload audit JSON only; never raw archives or executable distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-ka04-provenance-json-only
+          path: |
+            audit-reports/KA04.json
+            ka04-cohort-readiness.json
+          retention-days: 7
+          if-no-files-found: error

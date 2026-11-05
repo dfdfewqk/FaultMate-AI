@@ -5,6 +5,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -17,7 +18,7 @@ def smoke():
         sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     env={**os.environ,'FAULTMATE_NO_BROWSER':'1','FAULTMATE_PORT':str(port)}
     env.pop('DEEPSEEK_API_KEY',None)
-    process=subprocess.Popen([sys.executable,str(ROOT/'scripts/start.py')],cwd='/tmp',
+    process=subprocess.Popen([sys.executable,str(ROOT/'scripts/start.py')],cwd=tempfile.gettempdir(),
                              env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     url=f'http://127.0.0.1:{port}'
     def send(path,body=None,content_type='application/json'):
@@ -61,7 +62,7 @@ def smoke():
         raw,_=check('/api/ml/inspect',body=csv,ctype='text/csv')
         assert json.loads(raw)['status']=='unavailable'
         check('/api/ml/inspect',expected=415,body=csv)
-        print('REAL_HTTP_PASS',checks,'checks, subprocess launched from /tmp')
+        print('REAL_HTTP_PASS',checks,'checks, subprocess launched from platform temp directory')
     finally:
         process.terminate()
         try:process.wait(timeout=5)
