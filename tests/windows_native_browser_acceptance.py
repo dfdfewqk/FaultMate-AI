@@ -30,6 +30,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
+# Running this script directly from tests/ does not put the repository's
+# scripts/ package on sys.path; keep source fixtures and production isolated.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def available_local_port() -> int:
