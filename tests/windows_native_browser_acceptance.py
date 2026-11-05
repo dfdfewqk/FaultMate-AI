@@ -108,7 +108,7 @@ async def exercise_real_windows_chromium(base: str) -> dict:
             diagnosis_text = await page.locator("#triage-result").inner_text()
             assert "고장 원인을 확정하지 않았습니다" in diagnosis_text
 
-            await page.locator("#integration-panel summary").click()
+            await page.locator("#integration-panel > summary").click()
             assert "미연결" in await page.locator("#integration-ml").inner_text()
             assert await page.locator("#agent-run").is_disabled()
             await page.locator("#agent-preview").click()
