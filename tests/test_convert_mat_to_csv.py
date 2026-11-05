@@ -24,6 +24,11 @@ class MatConverterTests(unittest.TestCase):
         self.mat = self.root / "N15_M07_F10_K001_1.mat"
         self.output = self.root / "record.csv"
         self.metadata = self.root / "units.json"
+        self.evidence = self.root / "fixture-calibration.txt"
+        self.evidence.write_text(
+            "SYNTHETIC FIXTURE ONLY. This is NOT evidence for Paderborn's real units. " * 4,
+            encoding="utf-8",
+        )
         # Savemat creates the same kind of MATLAB Name/Data/Unit records.
         signals = np.empty((1, 2), dtype=object)
         for i, (name, values, unit) in enumerate([
@@ -32,6 +37,24 @@ class MatConverterTests(unittest.TestCase):
         ]):
             signals[0, i] = {"Name": name, "Data": values, "Unit": unit}
         savemat(self.mat, {"N15_M07_F10_K001_1": {"Y": signals}})
+
+    def synthetic_review_manifest(self):
+        # Test fixture proving software gates, not evidence of real Paderborn SI units.
+        return {
+            "source_sha256": hashlib.sha256(self.mat.read_bytes()).hexdigest(),
+            "vibration_channel": "vibration_1", "current_channel": "phase_current_1",
+            "vibration_unit": "m/s²", "current_unit": "A",
+            "stored_mat_values_calibration_verified": True,
+            "evidence_document_sha256": hashlib.sha256(self.evidence.read_bytes()).hexdigest(),
+            "evidence_type": "primary_dataset_documentation",
+            "evidence_url": "https://example.org/synthetic-fixture-only",
+            "evidence_location": "synthetic section 1",
+            "unit_evidence": "Synthetic hypothetical calibration of stored numerical MAT sample values; not a real source",
+            "reviewed_by": "synthetic_test_reviewer",
+            "reviewed_utc": "2026-11-05T00:00:00+00:00",
+            "vibration_scale_to_m_s2": 1.0,
+            "current_scale_to_a": 1.0,
+        }
 
     def run_converter(self, *args):
         base = [sys.executable, str(SCRIPT), "--mat", str(self.mat),
@@ -80,13 +103,9 @@ class MatConverterTests(unittest.TestCase):
         signals[0, 0] = {"Name": "vibration_1", "Data": np.arange(32, dtype=float), "Unit": ""}
         signals[0, 1] = {"Name": "phase_current_1", "Data": np.arange(32, dtype=float), "Unit": ""}
         savemat(self.mat, {"Y": signals})
-        self.metadata.write_text(json.dumps({
-            "source_sha256": hashlib.sha256(self.mat.read_bytes()).hexdigest(),
-            "vibration_channel": "vibration_1", "current_channel": "phase_current_1",
-            "vibration_unit": "m/s²", "current_unit": "A",
-            "unit_evidence": "Human-reviewed official sensor calibration page, section 3",
-        }), encoding="utf-8")
-        result = self.run_converter("--unit-manifest", str(self.metadata))
+        self.metadata.write_text(json.dumps(self.synthetic_review_manifest()), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(self.output.is_file())
 
@@ -103,6 +122,68 @@ class MatConverterTests(unittest.TestCase):
         result = self.run_converter("--unit-manifest", str(self.metadata))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("hash_mismatch", result.stderr)
+
+    def test_legacy_manifest_with_unverified_free_text_still_fails_closed(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.arange(32, dtype=float), "Unit": ""}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.arange(32, dtype=float), "Unit": ""}
+        savemat(self.mat, {"Y": signals})
+        self.metadata.write_text(json.dumps({
+            "source_sha256": hashlib.sha256(self.mat.read_bytes()).hexdigest(),
+            "vibration_channel": "vibration_1", "current_channel": "phase_current_1",
+            "vibration_unit": "m/s²", "current_unit": "A",
+            "unit_evidence": "Unsupported claim that raw values are calibrated.",
+        }), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unit_evidence_document_required", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_source_document_hash_mismatch_does_not_create_csv(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.arange(32, dtype=float), "Unit": ""}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.arange(32, dtype=float), "Unit": ""}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["evidence_document_sha256"] = "f" * 64
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unit_evidence_document_hash_mismatch", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_review_with_missing_stored_numeric_calibration_fails(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.arange(32, dtype=float), "Unit": ""}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.arange(32, dtype=float), "Unit": ""}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["stored_mat_values_calibration_verified"] = False
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stored_numeric_calibration_not_verified", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_hypothetical_source_bound_scaling_applies_to_values_not_just_names(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.linspace(-1, 1, 32), "Unit": ""}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.linspace(-2, 2, 32), "Unit": ""}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["vibration_scale_to_m_s2"] = 2.0
+        manifest["current_scale_to_a"] = 3.0
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with self.output.open(encoding="utf-8", newline="") as source:
+            actual = list(csv.DictReader(source))[0]
+        self.assertAlmostEqual(float(actual["vibration_peak_m_s2"]), 2.0)
+        self.assertAlmostEqual(float(actual["current_rms_a"]),
+                               float(np.sqrt(np.mean(np.linspace(-2, 2, 32) ** 2))) * 3.0)
 
     def test_inspection_only(self):
         result = self.run_converter("--inspect")
