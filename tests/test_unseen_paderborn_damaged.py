@@ -44,7 +44,7 @@ def _synthetic_source_files(tmp_path):
             "evaluation_role": "never_seen_damaged_only",
             "status": "real_original_unseen_damaged_features_unapproved",
             "source_model_sha256": PINNED_MODEL_SHA,
-            "source_manifest_sha256": sha256(MANIFEST),
+            "source_manifest_sha256": canonical_json_sha256(MANIFEST),
             "label_source": "Lessmeier et al. (2016), Table 5",
             "bearing_id": asset, "label": "damaged",
             "damage_origin": "accelerated_lifetime", "license": "CC BY-NC 4.0",
@@ -73,7 +73,7 @@ def test_model_is_fixed_unapproved_and_still_excludes_new_bearings():
     fixed = frozen_coefficients()
     assert len(fixed["coefs"]) == len(FEATURE_NAMES) == 12
     assert fixed["threshold"] == .5
-    assert fixed["model_sha256"] == sha256(ORIGINAL_MODEL) == PINNED_MODEL_SHA
+    assert fixed["model_sha256"] == canonical_json_sha256(ORIGINAL_MODEL) == PINNED_MODEL_SHA
     model = json.loads(ORIGINAL_MODEL.read_text(encoding="utf-8"))
     assert model["approved_for_runtime"] is False
     assert model["runtime_inference_compatible"] is False
