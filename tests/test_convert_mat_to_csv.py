@@ -54,6 +54,10 @@ class MatConverterTests(unittest.TestCase):
             "reviewed_utc": "2026-11-05T00:00:00+00:00",
             "vibration_scale_to_m_s2": 1.0,
             "current_scale_to_a": 1.0,
+            "vibration_stored_unit": "m/s²",
+            "current_stored_unit": "A",
+            "vibration_offset_in_stored_unit": 0.0,
+            "current_offset_in_stored_unit": 0.0,
         }
 
     def run_converter(self, *args):
@@ -174,6 +178,8 @@ class MatConverterTests(unittest.TestCase):
         signals[0, 1] = {"Name": "phase_current_1", "Data": np.linspace(-2, 2, 32), "Unit": ""}
         savemat(self.mat, {"Y": signals})
         manifest = self.synthetic_review_manifest()
+        manifest["vibration_stored_unit"] = "V"
+        manifest["current_stored_unit"] = "V"
         manifest["vibration_scale_to_m_s2"] = 2.0
         manifest["current_scale_to_a"] = 3.0
         self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
@@ -185,6 +191,76 @@ class MatConverterTests(unittest.TestCase):
         self.assertAlmostEqual(float(actual["vibration_peak_m_s2"]), 2.0)
         self.assertAlmostEqual(float(actual["current_rms_a"]),
                                float(np.sqrt(np.mean(np.linspace(-2, 2, 32) ** 2))) * 3.0)
+
+
+    def test_voltage_current_requires_known_zero_reference(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.linspace(-1, 1, 32), "Unit": ""}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.linspace(1.5, 3.5, 32), "Unit": ""}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["vibration_stored_unit"] = "V"
+        manifest["current_stored_unit"] = "V"
+        manifest["vibration_scale_to_m_s2"] = 2.0
+        manifest["current_scale_to_a"] = 24.0
+        manifest.pop("current_offset_in_stored_unit")
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stored_input_offset_missing_or_invalid", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_voltage_zero_reference_is_subtracted_before_rms(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.linspace(-1, 1, 32), "Unit": ""}
+        raw_current = np.linspace(1.5, 3.5, 32)
+        signals[0, 1] = {"Name": "phase_current_1", "Data": raw_current, "Unit": ""}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["vibration_stored_unit"] = "V"
+        manifest["current_stored_unit"] = "V"
+        manifest["vibration_scale_to_m_s2"] = 2.0
+        manifest["current_scale_to_a"] = 24.0
+        manifest["current_offset_in_stored_unit"] = 2.5
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with self.output.open(encoding="utf-8", newline="") as stream:
+            row = list(csv.DictReader(stream))[0]
+        expected = float(np.sqrt(np.mean((raw_current - 2.5) ** 2))) * 24
+        self.assertAlmostEqual(float(row["current_rms_a"]), expected, places=8)
+
+    def test_stored_unit_must_match_nonempty_mat_unit(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.linspace(-1, 1, 32), "Unit": "V"}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.linspace(-1, 1, 32), "Unit": "V"}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["vibration_stored_unit"] = "m/s²"
+        manifest["current_stored_unit"] = "A"
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stored_input_unit_mismatch_with_mat", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_g_conversion_must_use_physical_constant(self):
+        signals = np.empty((1, 2), dtype=object)
+        signals[0, 0] = {"Name": "vibration_1", "Data": np.linspace(-1, 1, 32), "Unit": "g"}
+        signals[0, 1] = {"Name": "phase_current_1", "Data": np.linspace(-1, 1, 32), "Unit": "A"}
+        savemat(self.mat, {"Y": signals})
+        manifest = self.synthetic_review_manifest()
+        manifest["vibration_stored_unit"] = "g"
+        manifest["vibration_scale_to_m_s2"] = 1.0
+        self.metadata.write_text(json.dumps(manifest), encoding="utf-8")
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("g_to_m_s2_scale_incorrect", result.stderr)
+        self.assertFalse(self.output.exists())
 
     def test_inspection_only(self):
         result = self.run_converter("--inspect")
