@@ -201,7 +201,7 @@ def probe_public_folder_metadata(*, timeout_seconds: int = 55) -> dict:
         # names, never Google file IDs, download tokens, cookies or CSV contents.
         # This may be a PARTIAL gdown listing, not the 51-state inventory.
         result["public_entry_path_sample"] = sorted({
-            re.sub(r"[^\\w/.+() -]", "_", p)[:180]
+            re.sub(r"[^\w/.+() -]", "_", p)[:180]
             for p in paths if p and len(p) < 500
         })[:25]
         result["metadata_listing_complete"] = False
