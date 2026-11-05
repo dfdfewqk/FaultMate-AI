@@ -31,7 +31,15 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
         raise SourceAuditError("audit_reports_directory_missing_or_symlink")
     catalog_data = catalog_path.read_bytes()
     official = {row["id"]: row for row in validate_catalog(json.loads(catalog_data))}
-    catalog_digest = hashlib.sha256(catalog_data).hexdigest()
+    # Windows checkout may produce CRLF while Linux uses LF for the SAME JSON.
+    # Accept ONLY hashes of these two line-ending representations of the
+    # repository-pinned catalog, never arbitrary metadata or unknown variants.
+    catalog_lf = catalog_data.replace(b"\r\n", b"\n")
+    catalog_digest = hashlib.sha256(catalog_lf).hexdigest()
+    permitted_catalog_digests = {
+        catalog_digest,
+        hashlib.sha256(catalog_lf.replace(b"\n", b"\r\n")).hexdigest(),
+    }
     files = sorted(reports_dir.glob("*.json"))
     if not files:
         raise SourceAuditError("no_raw_audit_reports")
@@ -60,7 +68,7 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
         if (report.get("status") != "source_verified_raw_units_unapproved"
             or report.get("source_md5_verified") is not True
             or report.get("source_archive_md5") != source["md5"]
-            or report.get("source_catalog_sha256") != catalog_digest
+            or report.get("source_catalog_sha256") not in permitted_catalog_digests
             or type(report.get("source_archive_size_bytes")) is not int
             or report["source_archive_size_bytes"] < 100_000_000
             or report.get("archive_inventory_verified") != "80_mat_files_across_4_conditions"
