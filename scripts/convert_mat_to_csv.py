@@ -103,7 +103,7 @@ def choose(channels, names):
 
 def verify_units(path: Path, vibration, current, manifest_path: Path | None,
                  evidence_document: Path | None = None):
-    """Return (evidence, vibration-to-SI multiplier, current-to-SI multiplier).
+    """Return (evidence, vib scale, current scale, vib offset, current offset).
 
     Empty Unit fields can only be overridden with a source-MAT-bound calibration
     review and a *local evidence document* whose SHA-256 is pinned. A sensor
@@ -113,7 +113,7 @@ def verify_units(path: Path, vibration, current, manifest_path: Path | None,
     """
     units = (vibration["unit"], current["unit"])
     if units in (("m/s²", "A"), ("m/s^2", "A")):
-        return "mat_metadata", 1.0, 1.0
+        return "mat_metadata", 1.0, 1.0, 0.0, 0.0
     if not manifest_path:
         raise ValueError("unit_metadata_missing_or_unsupported; provide reviewed --unit-manifest")
     if evidence_document is None:
@@ -167,6 +167,34 @@ def verify_units(path: Path, vibration, current, manifest_path: Path | None,
         if type(raw) not in (int, float) or not math.isfinite(raw) or raw <= 0:
             raise ValueError("invalid_calibration_scale:" + name)
         factors.append(float(raw))
+    # Conversion is affine, not just a multiplier. The LEM CKSR sensor can
+    # produce a 2.5 V zero-current reference; blindly multiplying a raw
+    # voltage by A/V would invent a large DC current. Reject missing offsets.
+    stored_units = []
+    offsets = []
+    for channel, allowed, stored_key, offset_key in (
+        (vibration, ("m/s²", "m/s^2", "g", "V", "mV"),
+         "vibration_stored_unit", "vibration_offset_in_stored_unit"),
+        (current, ("A", "V", "mV"),
+         "current_stored_unit", "current_offset_in_stored_unit"),
+    ):
+        stored = manifest.get(stored_key)
+        if stored not in allowed:
+            raise ValueError("stored_input_unit_missing_or_invalid:" + stored_key)
+        declared = channel["unit"]
+        if declared not in ("", "unknown") and declared.replace("m/s^2", "m/s²") != stored.replace("m/s^2", "m/s²"):
+            raise ValueError("stored_input_unit_mismatch_with_mat")
+        raw_offset = manifest.get(offset_key)
+        if type(raw_offset) not in (int, float) or not math.isfinite(raw_offset):
+            raise ValueError("stored_input_offset_missing_or_invalid:" + offset_key)
+        stored_units.append(stored)
+        offsets.append(float(raw_offset))
+    if stored_units[0] in ("m/s²", "m/s^2") and (factors[0] != 1.0 or offsets[0] != 0.0):
+        raise ValueError("vibration_si_scale_offset_conflict")
+    if stored_units[0] == "g" and not math.isclose(factors[0], 9.80665, rel_tol=1e-7):
+        raise ValueError("g_to_m_s2_scale_incorrect")
+    if stored_units[1] == "A" and (factors[1] != 1.0 or offsets[1] != 0.0):
+        raise ValueError("current_si_scale_offset_conflict")
     # Do not accept a reviewer overriding a *known* incompatible MAT unit.
     if vibration["unit"] not in ("", "unknown", "V", "mV", "g", "m/s²", "m/s^2"):
         raise ValueError("unsupported_vibration_mat_unit")
@@ -176,7 +204,7 @@ def verify_units(path: Path, vibration, current, manifest_path: Path | None,
         raise ValueError("vibration_si_metadata_scale_conflict")
     if current["unit"] == "A" and factors[1] != 1.0:
         raise ValueError("current_si_metadata_scale_conflict")
-    return explanation.strip(), factors[0], factors[1]
+    return explanation.strip(), factors[0], factors[1], offsets[0], offsets[1]
 
 def as_signal(item):
     values = np.asarray(item["values"])
@@ -216,12 +244,13 @@ def convert(args):
         raise ValueError("asset_id_does_not_match_recording_filename")
     vib = choose(channels, VIBRATION)
     cur = choose(channels, CURRENT)
-    unit_evidence, vibration_scale, current_scale = verify_units(
+    unit_evidence, vibration_scale, current_scale, vibration_offset, current_offset = verify_units(
         file, vib, cur,
         Path(args.unit_manifest) if args.unit_manifest else None,
         Path(args.unit_evidence_document) if getattr(args, "unit_evidence_document", None) else None,
     )
-    vibration, current = as_signal(vib) * vibration_scale, as_signal(cur) * current_scale
+    vibration = (as_signal(vib) - vibration_offset) * vibration_scale
+    current = (as_signal(cur) - current_offset) * current_scale
     if not np.all(np.isfinite(vibration)) or not np.all(np.isfinite(current)):
         raise ValueError("invalid_calibrated_signal")
     if vibration.size != current.size:
