@@ -1,0 +1,143 @@
+name: FaultMate real Paderborn unitless ML experiment (no SI claim, no release)
+on:
+  push:
+    branches:
+      - work/faultmate-real-unitless-ml-20261105
+    paths:
+      - .github/workflows/real-paderborn-unitless-ml.yml
+      - scripts/extract_paderborn_unitless.py
+      - scripts/train_paderborn_unitless.py
+      - tests/test_unitless_real_ml_pipeline.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: faultmate-real-paderborn-unitless-20261105
+  cancel-in-progress: false
+
+jobs:
+  software-gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing declared science + tests
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Verify software without real data or paid API
+        env:
+          DEEPSEEK_API_KEY: ""
+        run: |
+          python -m pytest -q tests
+          python -m compileall -q scripts faultmate
+          python scripts/extract_paderborn_unitless.py --help
+          python scripts/train_paderborn_unitless.py --help
+          python - <<'PY'
+          from faultmate.integration.ml import load_validated_model
+          assert load_validated_model() is None, "Never activate experimental model"
+          print("SOFTWARE_GATES_PASS_UNTRAINED_RUNTIME")
+          PY
+
+  extract-real-archive:
+    needs: software-gates
+    name: Real MD5 + 80 MAT unitless features (${{ matrix.bearing }})
+    runs-on: windows-2025
+    timeout-minutes: 35
+    strategy:
+      max-parallel: 4
+      fail-fast: false
+      matrix:
+        bearing: [K001, K002, K003, K004, K005, K006, KA04, KA16, KB23, KI04, KI16, KI18]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only science dependencies for original sensor readers
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-ml.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download known original-MD5 source to temporary runner only
+        shell: pwsh
+        run: |
+          $source = 'https://zenodo.org/records/15845309/files/${{ matrix.bearing }}.rar?download=1'
+          $archive = Join-Path $env:RUNNER_TEMP '${{ matrix.bearing }}.rar'
+          & curl.exe --fail --location --retry 2 --connect-timeout 25 --max-time 650 --silent --show-error $source --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Item $archive).Length -lt 100000000) { throw "official RAR unexpectedly short" }
+      - name: Recompute original MD5 and 80 MAT signal SHA and dimensionless features
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP '${{ matrix.bearing }}.rar'
+          New-Item -ItemType Directory -Force -Path feature-reports | Out-Null
+          python scripts/extract_paderborn_unitless.py --archive $archive --bearing-id '${{ matrix.bearing }}' --out 'feature-reports/${{ matrix.bearing }}.json'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content 'feature-reports/${{ matrix.bearing }}.json' -Raw | ConvertFrom-Json
+          if ($r.source_recording_count -ne 80 -or $r.archive_verified -ne $true -or $r.approved_for_runtime -ne $false) {
+            throw "Original archive provenance or no-activation check failed"
+          }
+          Write-Output "REAL_UNITLESS_BEARING_EXTRACTED: ${{ matrix.bearing }} $($r.unique_recording_count) unique features"
+      - name: Upload derived features and exact SHA fingerprints only
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage4-unitless-bearing-${{ matrix.bearing }}
+          path: feature-reports/${{ matrix.bearing }}.json
+          retention-days: 7
+          if-no-files-found: error
+
+  independent-real-training:
+    needs: extract-real-archive
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing machine learning dependencies
+        run: python -m pip install -r requirements-ml.txt
+      - name: Retrieve this run's 12 original-signal-bound unitless feature summaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: stage4-unitless-bearing-*
+          path: feature-reports
+          merge-multiple: true
+      - name: Reuse 12 actual source MAT audits from verified original run
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41957475830
+          github-token: ${{ github.token }}
+          pattern: stage3-bearing-*
+          path: source-audits
+          merge-multiple: true
+      - name: Require matching 960 real source MATLAB SHA, 956 unique signals, 12 bearings, 2 unseen test bearings
+        run: |
+          python scripts/train_paderborn_unitless.py \
+            --feature-dir feature-reports \
+            --raw-audits-dir source-audits \
+            --out models/evaluation/raw_unitless_real_experiment_20261105
+      - name: Preserve real experimental performance report and unapproved coefficients only
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage4-real-12-bearing-unitless-evaluation-unapproved
+          path: models/evaluation/raw_unitless_real_experiment_20261105/*.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Ensure none of the experimental models was activated or packaged
+        run: |
+          test ! -e models/bearing_validated.json
+          test ! -e dist/FaultMateAI.exe
+          python - <<'PY'
+          import json
+          d=json.load(open('models/evaluation/raw_unitless_real_experiment_20261105/real_unitless_evaluation.json'))
+          assert d['ml_model_approved'] is False
+          assert d['provenance']['physical_si_units_verified'] is False
+          assert d['provenance']['unique_recordings'] == 956
+          print("REAL_PADERBORN_ML_COMPLETE_EVALUATION_UNAPPROVED")
+          PY
