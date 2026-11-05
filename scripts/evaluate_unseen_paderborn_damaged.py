@@ -22,8 +22,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.audit_paderborn_assets import OFFICIAL_CONDITIONS, SourceAuditError
 from scripts.extract_paderborn_unitless import FEATURE_NAMES, SCHEMA
 from scripts.extract_unseen_paderborn_damaged import (
-    KNOWN_NEW_MD5, MANIFEST, ORIGINAL_MODEL, PINNED_MODEL_SHA, sha256,
-    verified_manifest,
+    KNOWN_NEW_MD5, MANIFEST, ORIGINAL_MODEL, PINNED_MODEL_SHA,
+    canonical_json_sha256, verified_manifest,
 )
 
 HEX = re.compile(r"^[0-9a-f]{64}$")
@@ -34,7 +34,7 @@ KNOWN_TRAIN = {"K001", "K002", "K003", "K004", "K005",
 def frozen_coefficients(path: Path = ORIGINAL_MODEL) -> dict:
     if path.resolve() != ORIGINAL_MODEL.resolve():
         raise SourceAuditError("only_original_frozen_model_allowed")
-    if sha256(path) != PINNED_MODEL_SHA:
+    if canonical_json_sha256(path) != PINNED_MODEL_SHA:
         raise SourceAuditError("frozen_model_sha256_mismatch")
     doc = json.loads(path.read_text(encoding="utf-8"))
     if (doc.get("status") != "experimental_unapproved_not_for_runtime"
@@ -89,7 +89,7 @@ def verify_new_reports(folder: Path, manifest_path: Path = MANIFEST):
             or doc.get("evaluation_role") != "never_seen_damaged_only"
             or doc.get("status") != "real_original_unseen_damaged_features_unapproved"
             or doc.get("source_model_sha256") != PINNED_MODEL_SHA
-            or doc.get("source_manifest_sha256") != sha256(manifest_path)
+            or doc.get("source_manifest_sha256") != canonical_json_sha256(manifest_path)
             or doc.get("label_source") != "Lessmeier et al. (2016), Table 5"
             or doc.get("bearing_id") != asset
             or doc.get("label") != "damaged"
