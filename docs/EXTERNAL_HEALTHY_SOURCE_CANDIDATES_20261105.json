@@ -121,7 +121,12 @@
       "primary_evidence": "2026 Oxford Academic PHM24 paper and 2025 BJTU-RAO experiment paper",
       "additional_evidence_url": "https://doi.org/10.1108/SRT-11-2024-0017",
       "source_distribution_review_url": "https://github.com/jonathanadamrico/BJTU_PHM_Beijing_Benchmark",
-      "remarks": "64 kHz co-recorded vibration/current and a normal health state reported; equipment is subway train axlebox/motor/gear, NOT type 6203 and NOT the Paderborn 4 conditions x 20 runs. Exact distinct physical healthy axlebox bearing IDs, official original hashes, dataset reuse license, raw format & independent normal subset have NOT been verified. PHM contest data may duplicate BJTU-RAO samples. Do not evaluate the frozen Paderborn model or claim a new specificity."
+      "remarks": "Original authors provide a Google Drive folder and Baidu Netdisk distribution links (IEEE Access 2025 DOI 10.1109/ACCESS.2025.3551603), but actual original files/physical healthy bearing IDs/checksums/source dataset license are NOT verified in FaultMate. Both sensors reportedly sampled at 64kHz under 9 rail-bogie conditions, not original Paderborn 4x20 type 6203. PHM24 and BJTU benchmark subsets may overlap. Do not score frozen Paderborn model.",
+      "original_publisher_download_link_documented": true,
+      "original_publisher_document": "https://doi.org/10.1109/ACCESS.2025.3551603",
+      "original_publisher_distribution_url": "https://drive.google.com/drive/folders/1RlZvFw-v07VvsL2Ni9cS7iFrTPDIhn2r?usp=sharing",
+      "alternative_publisher_distribution_url": "https://pan.baidu.com/s/1S5F8URapHPArX2mV6FzDfA?pwd=9t74",
+      "actual_files_downloaded_and_verified": false
     }
   ],
   "safety_limits": [
