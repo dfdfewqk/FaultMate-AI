@@ -15,7 +15,7 @@ from scripts.audit_paderborn_assets import OFFICIAL_CONDITIONS
 from scripts.extract_paderborn_unitless import FEATURE_NAMES, SCHEMA
 from scripts.extract_unseen_paderborn_damaged import (
     KNOWN_NEW_MD5, MANIFEST, PINNED_MODEL_SHA, ORIGINAL_MODEL,
-    verified_manifest, sha256,
+    verified_manifest, sha256, canonical_json_sha256,
 )
 from scripts.evaluate_unseen_paderborn_damaged import (
     frozen_coefficients, evaluate, verify_new_reports, _wilson_interval,
@@ -157,3 +157,15 @@ def test_wilson_interval_small_n_not_claim_of_certain_accuracy():
     assert low < .70 and high == 1.0
     with pytest.raises(ValueError):
         _wilson_interval(9, 8)
+
+
+def test_line_ending_only_differences_preserve_json_proof_but_not_binary_hash(tmp_path):
+    lf = tmp_path / "unix.json"
+    crlf = tmp_path / "windows.json"
+    lf.write_bytes(b'{"model":1,\n"threshold":0.5}\n')
+    crlf.write_bytes(b'{"model":1,\r\n"threshold":0.5}\r\n')
+    assert canonical_json_sha256(lf) == canonical_json_sha256(crlf)
+    assert sha256(lf) != sha256(crlf)
+    modified = tmp_path / "tampered.json"
+    modified.write_bytes(b'{"model":2,\r\n"threshold":0.5}\r\n')
+    assert canonical_json_sha256(modified) != canonical_json_sha256(lf)
