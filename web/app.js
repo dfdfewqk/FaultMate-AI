@@ -790,10 +790,15 @@
           addList(agentResult,result.agent_review.questions);
         }
       }
-      agentFeedback.textContent = result.external_transfer_performed ? '외부 AI 검토 응답 수신 · 고장 확정 아님' :
-        '외부 AI 결과 없음 · 기존 로컬 진단 사용';
+      // A provider timeout/error may occur AFTER an HTTP request was sent.
+      // Never imply "no transfer" unless the server explicitly confirms it.
+      agentFeedback.textContent = result.external_transfer_performed === true
+        ? '외부 AI 검토 응답 수신 · 고장 확정 아님'
+        : result.external_transfer_performed === null || result.external_transfer_attempted === true
+          ? '외부 AI 전송 여부 확인 불가 · 재요청 전 미리보기와 동의 재확인'
+          : '외부 AI 전송 없음 · 기존 로컬 진단 사용';
     } catch (_e) {
-      if (version === agentPreviewVersion && !controller.signal.aborted) agentFeedback.textContent = 'AI 연결 실패 · 기존 로컬 진단 유지';
+      if (version === agentPreviewVersion && !controller.signal.aborted) agentFeedback.textContent = 'AI 연결 실패 · 외부 전송 여부 확인 불가 · 기존 로컬 진단 유지';
     } finally {
       if (version === agentPreviewVersion) {
         agentRequestController = null;
