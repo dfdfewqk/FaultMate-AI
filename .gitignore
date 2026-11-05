@@ -7,3 +7,10 @@ web/node_modules/
 
 /models/evaluation/
 *.secrets
+
+# Local Paderborn source recordings, calibration evidence and experimental artifacts
+/.venv-ml/
+/data/raw/
+/data/converted/
+/data/provenance/
+/data/evidence/
