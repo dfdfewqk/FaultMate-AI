@@ -33,7 +33,7 @@ jobs:
           python -m compileall -q faultmate scripts
           node --check web/app.js
           PYTHONPATH=. python tests/live_http_smoke.py
-      - name: Public dataset evidence gate: no fabricated new healthy test accuracy
+      - name: "Public dataset evidence gate: no fabricated new healthy test accuracy"
         run: |
           python scripts/audit_external_healthy_compatibility.py \
             --out /tmp/faultmate_public_healthy_source_readiness.json
