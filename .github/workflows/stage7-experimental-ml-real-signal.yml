@@ -1,0 +1,278 @@
+name: FaultMate Stage7 actual Paderborn sensor RAR to frozen ML research inference (no activation)
+on:
+  push:
+    branches:
+      - work/faultmate-stage7-experimental-ml-real-signal-20261105
+  pull_request:
+    branches:
+      - work/faultmate-stage7-windows-native-acceptance-20261105
+
+permissions:
+  contents: read
+
+jobs:
+  linux-full-and-readiness:
+    name: Linux complete Python + source compatibility + real local HTTP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing packages and test-only dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: All Stage 1-7 + BJTU independent normal source evidence guard, local HTTP and JavaScript
+        run: |
+          python -m pytest -q tests
+          python -m compileall -q faultmate scripts
+          node --check web/app.js
+          PYTHONPATH=. python tests/live_http_smoke.py
+      - name: Offline final readiness report - local checks PASS but actual release BLOCKED
+        run: |
+          python scripts/preflight_final_acceptance.py --out /tmp/faultmate_stage7_readiness.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/faultmate_stage7_readiness.json', encoding='utf-8'))
+          assert d['automatic_local_checks_passed'] is True
+          assert d['release_ready'] is False
+          assert d['paid_api_requests_performed'] == 0
+          assert d['experimental_model_activated'] is False
+          assert len(d['only_user_can_complete']) == 2
+          print('LOCAL_PREFLIGHT_PASS_RELEASE_GATED_USER_STEPS_LISTED')
+          PY
+      - name: BJTU original author's 51-state 9-condition 4-CSV physical asset count guard
+        run: |
+          python scripts/audit_bjtu_primary_layout.py --out /tmp/faultmate_bjtu_documented_structure.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/faultmate_bjtu_documented_structure.json'))
+          assert data['documented_normal_health_states'] == 1
+          assert data['documented_normal_operating_conditions'] == 9
+          assert data['documented_normal_csv_files'] == 36
+          assert data['documented_all_csv_files'] == 1836
+          assert data['nine_conditions_are_nine_independent_bearings'] is False
+          assert data['source_healthy_physical_bearings_verified'] == 0
+          assert data['false_positive_rate_measured'] is False
+          print('BJTU_ORIGINAL_SOURCE_DOCUMENT_LAYOUT_CONFIRMED_NO_FAKE_NORMAL_ASSETS')
+          PY
+      - name: Split archives size budget and unsafe large-download guard offline
+        run: |
+          python scripts/preflight_bjtu_split_archive_size.py \
+            --out /tmp/faultmate_bjtu_archive_feasibility.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/faultmate_bjtu_archive_feasibility.json"))
+          assert d["author_archive_part_count_expected"] == 3
+          assert d["safe_to_auto_download_or_extract_large_archive"] is False
+          assert d["original_csv_or_split_zip_data_downloaded"] is False
+          assert d["new_physically_independent_normal_bearings_verified"] == 0
+          print("SPLIT_ARCHIVE_BUDGET_GUARD_BLOCKS_UNCONTROLLED_FULL_ARCHIVE_FETCH")
+          PY
+      - name: DeepSeek final live acceptance command MUST remain offline without paid flags
+        run: |
+          python scripts/optional_deepseek_one_call_acceptance.py > /tmp/deepseek_acceptance_offline.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/deepseek_acceptance_offline.json"))
+          assert d["mode"] == "offline_preflight_only"
+          assert d["paid_request_attempted"] is False
+          assert d["api_key_read_or_printed"] is False
+          assert d["real_deepseek_connectivity_confirmed"] is False
+          print("LIVE_DEEPSEEK_NOT_CALLED_OFFLINE_ACCEPTANCE_PASS")
+          PY
+      - name: Research ML release decision using pinned real model, NO active ML
+        run: |
+          python scripts/decide_bearing_ml_application.py \
+            --out /tmp/faultmate_ml_application_decision.json
+          python - <<'PY'
+          import json
+          from faultmate.integration.ml import load_validated_model
+          d=json.load(open("/tmp/faultmate_ml_application_decision.json"))
+          assert d["original_real_training_model_content_verified"] is True
+          assert d["production_ml_activation_allowed"] is False
+          assert d["general_accuracy_measured"] is False
+          assert d["historical_damaged_evaluation"]["numbers_recomputed_in_this_command"] is False
+          assert d["new_independent_healthy_bearings_original_signals_verified"] == 0
+          assert load_validated_model() is None
+          print("EXPERIMENTAL_ML_TRAINED_MODEL_PROTECTED_NO_GO_VERIFIED")
+          PY
+      - name: "Public dataset evidence gate: no fabricated new healthy test accuracy"
+        run: |
+          python scripts/audit_external_healthy_compatibility.py \
+            --out /tmp/faultmate_public_healthy_source_readiness.json
+          python - <<'PY'
+          import json
+          from faultmate.integration.ml import load_validated_model
+          d=json.load(open('/tmp/faultmate_public_healthy_source_readiness.json'))
+          assert d['no_approved_healthy_source'] is True
+          assert d['new_healthy_bearings_validated'] == 0
+          assert d['false_positive_rate_measured'] is False
+          assert d['overall_accuracy_measured'] is False
+          assert all(x['direct_frozen_model_prediction_allowed'] is False for x in d['results'])
+          assert load_validated_model() is None
+          print('STAGE7_HEALTHY_SOURCES_BLOCKED_NO_FABRICATED_SPECIFICITY')
+          PY
+
+  windows-python-and-launcher:
+    name: Windows whole Python + real batch start + no API transfer
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Existing Windows bootstrap (isolated CI runner)
+        shell: cmd
+        run: call setup_windows.bat
+      - name: Install test-only machine learning + HTTP test dependencies
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt pytest httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Whole Windows Python + cross-site agent/DNS rebinding safety + launcher smoke
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pytest -q tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe tests/windows_launcher_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install test-only Playwright Chromium on the isolated Windows runner
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install playwright
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe -m playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real Windows .bat to uvicorn TCP to native Chromium full user acceptance
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe tests/windows_native_browser_acceptance.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "WINDOWS_REAL_LOCALHOST_CHROMIUM_ACCEPTANCE_PASS_PAID_ZERO"
+      - name: Windows offline readiness report without paid API call
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/preflight_final_acceptance.py --out "$env:RUNNER_TEMP\faultmate_readiness.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content "$env:RUNNER_TEMP\faultmate_readiness.json" -Raw | ConvertFrom-Json
+          if ($r.automatic_local_checks_passed -ne $true -or $r.release_ready -ne $false -or $r.paid_api_requests_performed -ne 0) {
+            throw "Release gate or automatic readiness has an invalid state"
+          }
+          Write-Output "WINDOWS_OFFLINE_PREFLIGHT_PASS_RELEASE_NOT_READY"
+      - name: Windows live DeepSeek paid acceptance stays OFFLINE without explicit user consent
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/optional_deepseek_one_call_acceptance.py > "$env:RUNNER_TEMP\deepseek_acceptance_offline.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $d = Get-Content "$env:RUNNER_TEMP\deepseek_acceptance_offline.json" -Raw | ConvertFrom-Json
+          if ($d.paid_request_attempted -ne $false -or $d.mode -ne "offline_preflight_only") {
+            throw "Paid DeepSeek API was not gated"
+          }
+          Write-Output "WINDOWS_LIVE_PAID_PROVIDER_STILL_BLOCKED"
+      - name: Windows scientific model release decision gate
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/decide_bearing_ml_application.py --out "$env:RUNNER_TEMP\ml_application_decision.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $decision = Get-Content "$env:RUNNER_TEMP\ml_application_decision.json" -Raw | ConvertFrom-Json
+          if ($decision.production_ml_activation_allowed -ne $false -or $decision.general_accuracy_measured -ne $false -or $decision.original_real_training_model_content_verified -ne $true) {
+            throw "Invalid ML model scientific release decision"
+          }
+          Write-Output "WINDOWS_ML_NO_GO_DEVELOPMENT_GATES_PASS"
+      - name: Cross-platform healthy compatibility blocks unchanged
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/audit_external_healthy_compatibility.py --out "$env:RUNNER_TEMP\healthy_readiness.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content "$env:RUNNER_TEMP\healthy_readiness.json" -Raw | ConvertFrom-Json
+          if ($report.new_healthy_bearings_validated -ne 0 -or $report.false_positive_rate_measured -ne $false) {
+            throw "falsely validated normal bearings"
+          }
+
+  chromium-existing-ui:
+    name: Chromium full P7.2 UI + attempted transfer warning and mocked agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing dependencies, browser and tests
+        run: |
+          python -m pip install -r requirements-ml.txt pytest httpx playwright
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium
+          sudo mkdir -p /mnt/data
+          sudo chown "$(id -u):$(id -g)" /mnt/data
+      - name: Regression on each existing screen and Stage6 connected user path
+        run: |
+          for test in \
+            tests/browser_smoke.py tests/browser_step1.py tests/browser_step2.py \
+            tests/browser_step3.py tests/browser_step4.py tests/browser_step5.py \
+            tests/browser_final_integration.py tests/browser_stage6_integrated.py; do
+            PYTHONPATH=. python "$test" || exit 1
+          done
+
+
+
+
+  real-original-paderborn-research-ml:
+    name: REAL K001 original MD5 RAR > 80 MAT > 12 features > frozen research ML score
+    runs-on: windows-2025
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install already declared science dependencies (no app packaging)
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-ml.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download only original K001 archive into disposable runner temporary folder
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          & curl.exe --fail --location --retry 1 --connect-timeout 25 --max-time 650 --silent --show-error "https://zenodo.org/records/15845309/files/K001.rar?download=1" --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Item $archive).Length -lt 100000000) { throw "Original K001 archive too short" }
+      - name: Actual original archive MD5, complete 4x20 paired MATLAB, frozen model prediction
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          $result = Join-Path $env:RUNNER_TEMP "faultmate_k001_real_research_prediction.json"
+          python scripts/run_experimental_paderborn_ml.py --archive $archive --bearing-id K001 --out $result
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $result -Raw | ConvertFrom-Json
+          if ($r.source_archive_verified_from_original_bytes_same_run -ne $true -or
+              $r.source_mat_files_actually_read_this_run -ne 80 -or
+              $r.research_input_source.unique_signal_pairs -ne 80 -or
+              $r.runtime_ml_model_approved -ne $false -or
+              $r.independent_heldout_healthy_specificity_measured -ne $false -or
+              $r.new_independent_test_bearing_claimed -ne $false) {
+            throw "Real original experiment provenance or research-only safety failed"
+          }
+          Write-Output "REAL_ORIGINAL_PADERBORN_K001_80_MAT_TO_FROZEN_ML_PASS"
+          Write-Output "REAL_RESEARCH_SCORE_$($r.experimental_damage_model_score)_PRED_$($r.experimental_predicted_label)_NOT_FRESH_TEST"
+      - name: Real experimental prediction did not activate the production app
+        shell: pwsh
+        run: |
+          python -c "from faultmate.integration.ml import load_validated_model; assert load_validated_model() is None; print('ORIGINAL_ML_EXPERIMENT_COMPLETE_PRODUCTION_STILL_UNAPPROVED')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
