@@ -933,7 +933,7 @@
       }
     }
   });
-}  // Optional research-only direct original source upload.
+  // Optional research-only direct original source upload.
   // No original signal leaves localhost. The backend rechecks archive MD5,
   // the full original 80 MAT records and the pinned frozen science model.
   const rawRarInput = document.getElementById('raw-rar-upload');
