@@ -113,7 +113,15 @@ def _validate_fixed_source_inventory(doc: dict) -> None:
             != "2026 Oxford Academic PHM24 paper and 2025 BJTU-RAO experiment paper"
         or phm.get("additional_evidence_url") != "https://doi.org/10.1108/SRT-11-2024-0017"
         or phm.get("source_distribution_review_url")
-            != "https://github.com/jonathanadamrico/BJTU_PHM_Beijing_Benchmark"):
+            != "https://github.com/jonathanadamrico/BJTU_PHM_Beijing_Benchmark"
+        or phm.get("original_publisher_download_link_documented") is not True
+        or phm.get("original_publisher_document")
+            != "https://doi.org/10.1109/ACCESS.2025.3551603"
+        or phm.get("original_publisher_distribution_url")
+            != "https://drive.google.com/drive/folders/1RlZvFw-v07VvsL2Ni9cS7iFrTPDIhn2r?usp=sharing"
+        or phm.get("alternative_publisher_distribution_url")
+            != "https://pan.baidu.com/s/1S5F8URapHPArX2mV6FzDfA?pwd=9t74"
+        or phm.get("actual_files_downloaded_and_verified") is not False):
         raise SourceReadinessError("phm24_source_license_or_original_evidence_unverified")
     for row in rows:
         if row["source_id"] == "paderborn_healthy_reuse":
@@ -158,6 +166,7 @@ def assess_source_metadata(row: dict) -> dict:
     if source_id == "phm24_bjtu_rao_bogie":
         blockers.extend([
             "official_original_bearing_files_not_audited",
+            "publisher_download_links_only_not_checksum_or_license_confirmation",
             "per_asset_axlebox_healthy_label_and_unique_bearing_id_not_verified",
             "source_data_usage_license_and_release_access_unverified",
             "phm24_and_bjtu_rao_benchmark_overlap_not_audited",
