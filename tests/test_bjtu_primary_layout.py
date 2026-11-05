@@ -160,6 +160,9 @@ def test_gdown_metadata_only_success_still_cannot_certify_original_files(monkeyp
     assert result["public_drive_probe_requested"] is True
     assert result["google_drive_folder_reachable"] is True
     assert result["metadata_entries_returned"] == 1
+    assert result["public_entry_path_sample"] == [
+        "BJTU_RAO_Bogie_Datasets/M0_G0_LA0_RA0/Sample_1/report.csv"
+    ]
     assert result["metadata_listing_complete"] is False
     assert result["normal_folder_structurally_verified"] is False
     assert result["source_csv_sha256_verified"] is False
