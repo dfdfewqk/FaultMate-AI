@@ -47,7 +47,18 @@ PINNED_MODEL_SHA = "84a7c059fa769d1b0e2bd0075ecba92bcd06ae24acf961e0ea2120d9d44a
 
 
 def sha256(path: Path) -> str:
+    """Exact byte hash for BINARY original MAT (never normalize raw sensor data)."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def canonical_json_sha256(path: Path) -> str:
+    """Pin JSON file content equally on Windows checkout CRLF and Linux LF.
+
+    This must NEVER be used for RAR, MAT or raw signals. Changing JSON field
+    content still breaks the hardcoded SHA-256; only line endings are ignored.
+    """
+    raw = path.read_bytes()
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def verified_manifest(path: Path = MANIFEST) -> dict:
@@ -79,7 +90,7 @@ def verified_manifest(path: Path = MANIFEST) -> dict:
         raise SourceAuditError("new_bearing_primary_labels_invalid")
     if set(got) & (PREVIOUS_DEV | PREVIOUS_OPENED):
         raise SourceAuditError("previously_opened_bearing_used_as_unseen")
-    if not ORIGINAL_MODEL.is_file() or sha256(ORIGINAL_MODEL) != PINNED_MODEL_SHA:
+    if not ORIGINAL_MODEL.is_file() or canonical_json_sha256(ORIGINAL_MODEL) != PINNED_MODEL_SHA:
         raise SourceAuditError("frozen_original_model_not_identical")
     return doc
 
@@ -154,7 +165,7 @@ def extract_unseen(archive: Path, asset: str, *, sevenzip: str,
         "schema": SCHEMA, "evaluation_role": "never_seen_damaged_only",
         "status": "real_original_unseen_damaged_features_unapproved",
         "source_model_sha256": PINNED_MODEL_SHA,
-        "source_manifest_sha256": sha256(manifest_path),
+        "source_manifest_sha256": canonical_json_sha256(manifest_path),
         "label_source": "Lessmeier et al. (2016), Table 5",
         "bearing_id": asset, "label": "damaged",
         "damage_origin": "accelerated_lifetime",
