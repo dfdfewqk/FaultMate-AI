@@ -8,12 +8,30 @@ from faultmate.knowledge.repository import load_catalog, case_summaries, get_cas
 from faultmate.integration.context import ContextPreviewRequest, capabilities, evidence_preview
 from faultmate.integration.agent import AgentReviewRequest, review as review_agent, configured as agent_configured
 from faultmate.integration.ml import capabilities as ml_capabilities, inspect_csv, MAX_CSV_BYTES
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from faultmate.local_request_boundary import browser_request_allowed, REJECTION
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WEB = PROJECT_ROOT / "web"
 app = FastAPI(title="FaultMate AI", version="0.7.2", docs_url=None, redoc_url=None, openapi_url=None)
+
+@app.middleware("http")
+async def local_browser_request_boundary(request: Request, call_next):
+    """Reject DNS-rebinding Host and cross-origin POST before paid agent code.
+
+    No cookies, tokens or browser secrets are stored. Local Python/CLI calls
+    without Origin continue to work. The actual Windows launcher still binds
+    127.0.0.1; this also protects static assets from a foreign Host header.
+    """
+    if not browser_request_allowed(request):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": REJECTION},
+            headers={"Cache-Control": "no-store, private", "Pragma": "no-cache"},
+        )
+    return await call_next(request)
+
 
 @app.get("/api/status")
 def status():
