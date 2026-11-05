@@ -1,0 +1,49 @@
+name: FaultMate Stage 5 DeepSeek transport contract (NO PAID API)
+on:
+  push:
+    branches:
+      - work/faultmate-stage5-deepseek-transport-20261105
+    paths:
+      - .github/workflows/stage5-agent-transport-safety.yml
+      - faultmate/**
+      - scripts/**
+      - tests/**
+  pull_request:
+    branches:
+      - work/faultmate-stage4-ml-readiness-20261105
+
+permissions:
+  contents: read
+
+jobs:
+  safe-agent-regression:
+    name: Simulated DeepSeek API, consent, quotas and all regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      # An explicit dummy key is never a real credential.
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing app and test-only dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Full Python application, ML and DeepSeek mock regression
+        run: python -m pytest -q tests
+      - name: Static safety and syntax checks
+        run: |
+          python -m compileall -q faultmate scripts
+          python - <<'PY'
+          from faultmate.integration import agent
+          assert agent.MODEL == 'deepseek-flash'
+          assert agent.ENDPOINT == 'https://api.deepseek.com/chat/completions'
+          assert agent.MAX_COMPLETION_TOKENS == 600
+          assert not agent.configured()
+          print('STAGE5 PASS: Official endpoint, current model, no configured paid key, no real calls')
+          PY
+      - name: Keep checkout free of generated model and distribution files
+        run: |
+          test ! -f models/bearing_validated.json
+          test ! -f models/evaluation/bearing_evaluated.json
