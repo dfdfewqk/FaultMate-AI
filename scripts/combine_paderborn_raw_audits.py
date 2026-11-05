@@ -57,7 +57,7 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
             or report.get("source_md5_verified") is not True
             or report.get("source_archive_md5") != source["md5"]
             or report.get("source_catalog_sha256") != catalog_digest
-            or not isinstance(report.get("source_archive_size_bytes"), int)
+            or type(report.get("source_archive_size_bytes")) is not int
             or report["source_archive_size_bytes"] < 100_000_000
             or report.get("archive_inventory_verified") != "80_mat_files_across_4_conditions"
             or report.get("label") != source["label"]
@@ -89,6 +89,13 @@ def combine_audits(reports_dir: Path, catalog_path: Path = CATALOG) -> dict:
                 raise SourceAuditError(f"recording_identity_invalid:{bearing}")
             local_names.add(name)
             fingerprint = record.get("raw_signal_fingerprint")
+            if (record.get("vibration_channel") not in ("vibration_1", "vibration")
+                or record.get("current_channel") not in ("phase_current_1", "motor_current", "current_1")
+                or not isinstance(record.get("raw_vibration_unit"), str)
+                or not record["raw_vibration_unit"].strip()
+                or not isinstance(record.get("raw_current_unit"), str)
+                or not record["raw_current_unit"].strip()):
+                raise SourceAuditError("recording_channels_or_raw_units_missing")
             if (not _digest(fingerprint) or not _digest(record.get("mat_sha256"))
                 or type(record.get("sample_count")) is not int
                 or record["sample_count"] < 16):
