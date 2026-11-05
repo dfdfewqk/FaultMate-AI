@@ -1,0 +1,31 @@
+name: Stage 3 cohort coverage and raw audit safety (no distribution)
+on:
+  push:
+    branches:
+      - work/faultmate-cohort-12-raw-audit-20261105
+    paths:
+      - .github/workflows/cohort-coverage-safety.yml
+      - scripts/combine_paderborn_raw_audits.py
+      - tests/test_combine_paderborn_raw_audits.py
+
+permissions:
+  contents: read
+
+jobs:
+  python-safety-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing ML test dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Run all synthetic and security regression tests
+        run: python -m pytest -q tests
+      - name: Syntax test, parser and API regressions
+        run: |
+          python -m compileall -q faultmate scripts
+          python scripts/combine_paderborn_raw_audits.py --help
+          PYTHONPATH=. python tests/live_http_smoke.py
