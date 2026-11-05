@@ -66,15 +66,35 @@ def validate_review(evaluated_path: Path, report_path: Path, review_path: Path) 
     metrics = evaluated.get('heldout_evaluation')
     if not isinstance(metrics, dict) or any(report.get(key) != value for key, value in metrics.items()):
         raise ValueError('evaluation_report_mismatch')
-    for key in ('validation_macro_f1', 'validation_dummy_macro_f1', 'heldout_macro_f1'):
+    evidence = evaluated.get('provenance_check')
+    required_hashes = ('source_audit_sha256', 'review_sha256', 'feature_ledger_sha256')
+    if (not isinstance(evidence, dict)
+        or evidence.get('source_verified') is not True
+        or evidence.get('cohort_raw_audit_complete') is not True
+        or evidence.get('human_calibration_review_present') is not True
+        or not all(isinstance(evidence.get(k), str) and re.fullmatch('[a-f0-9]{64}', evidence[k]) for k in required_hashes)):
+        raise ValueError('real_data_provenance_or_calibration_review_missing')
+    for key in ('validation_macro_f1', 'validation_dummy_macro_f1', 'heldout_macro_f1',
+                'validation_bearing_macro_f1', 'validation_dummy_bearing_macro_f1',
+                'heldout_bearing_macro_f1'):
         if not _valid_score(metrics.get(key)):
             raise ValueError('evaluation_score_invalid')
+    if metrics['validation_bearing_macro_f1'] <= metrics['validation_dummy_bearing_macro_f1']:
+        raise ValueError('bearing_level_validation_baseline_not_beaten')
     if metrics['validation_macro_f1'] <= metrics['validation_dummy_macro_f1']:
         raise ValueError('validation_baseline_not_beaten')
     matrix = metrics.get('heldout_confusion_matrix')
     if not (isinstance(matrix, list) and len(matrix) == 2 and
         all(isinstance(row, list) and len(row) == 2 and all(type(v) is int and v >= 0 for v in row) for row in matrix)):
         raise ValueError('heldout_matrix_invalid')
+    bearing_matrix = metrics.get('heldout_bearing_confusion_matrix')
+    if not (isinstance(bearing_matrix, list) and len(bearing_matrix) == 2 and
+        all(isinstance(row, list) and len(row) == 2 and
+            all(type(v) is int and v >= 0 for v in row) for row in bearing_matrix)):
+        raise ValueError('heldout_bearing_matrix_invalid')
+    if (metrics.get('heldout_bearing_damage_missed_count') != bearing_matrix[0][1]
+        or metrics.get('heldout_bearing_false_damage_alarm_count') != bearing_matrix[1][0]):
+        raise ValueError('heldout_bearing_error_counts_mismatch')
     partitions = report.get('partition_by_asset')
     if not isinstance(partitions, dict) or not partitions:
         raise ValueError('independent_split_report_missing')
@@ -83,6 +103,12 @@ def validate_review(evaluated_path: Path, report_path: Path, review_path: Path) 
         raise ValueError('partition_names_invalid')
     if any(counts[k] != metrics.get(k + '_asset_count') or counts[k] < 2 for k in counts):
         raise ValueError('partition_count_mismatch')
+    if sum(map(sum, bearing_matrix)) != counts['test']:
+        raise ValueError('heldout_bearing_count_mismatch')
+    if (review.get('source_audit_sha256') != evidence['source_audit_sha256']
+        or review.get('calibration_review_sha256') != evidence['review_sha256']
+        or review.get('feature_ledger_sha256') != evidence['feature_ledger_sha256']):
+        raise ValueError('human_review_provenance_binding_missing')
     if review.get('decision') != APPROVAL:
         raise ValueError('explicit_human_approval_missing')
     if review.get('evaluated_sha256') != digest or review.get('data_sha256') != evaluated['data_sha256']:
@@ -102,7 +128,9 @@ def validate_review(evaluated_path: Path, report_path: Path, review_path: Path) 
     result = dict(evaluated)
     result['status'] = 'validated'
     result['review_record'] = {key: review[key] for key in
-        ('decision', 'evaluated_sha256', 'data_sha256', 'reviewed_by', 'reviewed_utc', *REVIEW_CHECKS, 'notes')}
+        ('decision', 'evaluated_sha256', 'data_sha256', 'source_audit_sha256',
+         'calibration_review_sha256', 'feature_ledger_sha256',
+         'reviewed_by', 'reviewed_utc', *REVIEW_CHECKS, 'notes')}
     return result
 
 
