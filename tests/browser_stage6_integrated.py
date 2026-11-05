@@ -93,6 +93,9 @@ async def run():
                 assert not await page.locator("#agent-consent").is_checked()
                 assert len(invocations) == 0
 
+                # Changing symptoms invalidates the old case as well as consent.
+                # Select the case again before requesting a fresh reviewed preview.
+                await page.locator("#triage-case").select_option("CONV-001")
                 await page.locator("#agent-preview").click()
                 await page.locator("#agent-preview-content:not([hidden])").wait_for()
                 await page.locator("#agent-consent").check()
