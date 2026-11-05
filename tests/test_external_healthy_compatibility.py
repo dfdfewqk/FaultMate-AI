@@ -129,6 +129,10 @@ def test_railway_phm24_64k_both_sensors_is_still_unproven_as_paderborn_normal():
     assert row["original_download_and_usage_terms_verified"] is False
     assert row["physical_healthy_asset_ids"] is None
     assert row["license"] == "not_verified_for_source_data"
+    assert row["original_publisher_download_link_documented"] is True
+    assert row["actual_files_downloaded_and_verified"] is False
+    assert row["original_publisher_distribution_url"].startswith(
+        "https://drive.google.com/drive/folders/")
     result = {x["source_id"]: x for x in assess_inventory()["results"]}[
         "phm24_bjtu_rao_bogie"
     ]
@@ -152,6 +156,11 @@ def test_railway_phm24_64k_both_sensors_is_still_unproven_as_paderborn_normal():
     ("other_domain_equivalence_reviewed", True),
     ("original_download_and_usage_terms_verified", True),
     ("additional_evidence_url", "https://malicious.example"),
+    ("original_publisher_download_link_documented", False),
+    ("original_publisher_document", "https://untrusted.invalid"),
+    ("original_publisher_distribution_url", "https://untrusted.invalid/drive"),
+    ("alternative_publisher_distribution_url", "https://untrusted.invalid/baidu"),
+    ("actual_files_downloaded_and_verified", True),
 ])
 def test_phm24_public_metadata_cannot_fabricate_origins_or_originals(field, fake):
     doc = copy.deepcopy(_inventory())
