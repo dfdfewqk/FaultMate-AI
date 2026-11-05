@@ -119,7 +119,8 @@ class MatConverterTests(unittest.TestCase):
             "vibration_channel": "vibration_1", "current_channel": "phase_current_1",
             "vibration_unit": "m/s²", "current_unit": "A", "unit_evidence": "fake evidence document",
         }), encoding="utf-8")
-        result = self.run_converter("--unit-manifest", str(self.metadata))
+        result = self.run_converter("--unit-manifest", str(self.metadata),
+                                    "--unit-evidence-document", str(self.evidence))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("hash_mismatch", result.stderr)
 
