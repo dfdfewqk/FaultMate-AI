@@ -7,7 +7,7 @@ permitted. No source is eligible merely because it has "healthy" recordings.
 
 A new input protocol/independent validation must be reviewed separately for
 any cross-domain data; existing 4-condition Paderborn model cannot accept
-3-load KAIST or variable-speed KAIST as drop-in assets.
+3-load KAIST, variable-speed KAIST, nor PHM24/BJTU railway data as drop-in assets.
 """
 from __future__ import annotations
 
@@ -39,6 +39,12 @@ EXPECTED_CANDIDATES = {
         "url": "https://data.mendeley.com/datasets/vxkj334rzv",
         "license": "CC BY 4.0", "vib_hz": 25600, "cur_hz": 100000,
         "conditions": None, "match": False, "independent_site": True,
+    },
+    "phm24_bjtu_rao_bogie": {
+        "url": "https://academic.oup.com/tse/article/8/2/tdag011/8644296",
+        "license": "not_verified_for_source_data",
+        "vib_hz": 64000, "cur_hz": 64000,
+        "conditions": 9, "match": False, "independent_site": True,
     },
 }
 
@@ -99,6 +105,24 @@ def _validate_fixed_source_inventory(doc: dict) -> None:
         or reused.get("source_archive_integrity_verified") is not True
         or reused.get("source_raw_signal_integrity_verified") is not True):
         raise SourceReadinessError("paderborn_known_six_reused_not_new")
+    phm = next(r for r in rows if r["source_id"] == "phm24_bjtu_rao_bogie")
+    # The publication's CC BY article license does NOT establish dataset
+    # reuse rights or prove the exact raw competition files were downloaded.
+    if (phm.get("original_download_and_usage_terms_verified") is not False
+        or phm.get("primary_evidence")
+            != "2026 Oxford Academic PHM24 paper and 2025 BJTU-RAO experiment paper"
+        or phm.get("additional_evidence_url") != "https://doi.org/10.1108/SRT-11-2024-0017"
+        or phm.get("source_distribution_review_url")
+            != "https://github.com/jonathanadamrico/BJTU_PHM_Beijing_Benchmark"
+        or phm.get("original_publisher_download_link_documented") is not True
+        or phm.get("original_publisher_document")
+            != "https://doi.org/10.1109/ACCESS.2025.3551603"
+        or phm.get("original_publisher_distribution_url")
+            != "https://drive.google.com/drive/folders/1RlZvFw-v07VvsL2Ni9cS7iFrTPDIhn2r?usp=sharing"
+        or phm.get("alternative_publisher_distribution_url")
+            != "https://pan.baidu.com/s/1S5F8URapHPArX2mV6FzDfA?pwd=9t74"
+        or phm.get("actual_files_downloaded_and_verified") is not False):
+        raise SourceReadinessError("phm24_source_license_or_original_evidence_unverified")
     for row in rows:
         if row["source_id"] == "paderborn_healthy_reuse":
             continue
@@ -139,6 +163,14 @@ def assess_source_metadata(row: dict) -> dict:
     if row.get("independent_data_acquisition_site") is True:
         if row.get("other_domain_equivalence_reviewed") is not True:
             blockers.append("independent_site_domain_shift_not_reviewed")
+    if source_id == "phm24_bjtu_rao_bogie":
+        blockers.extend([
+            "official_original_bearing_files_not_audited",
+            "publisher_download_links_only_not_checksum_or_license_confirmation",
+            "per_asset_axlebox_healthy_label_and_unique_bearing_id_not_verified",
+            "source_data_usage_license_and_release_access_unverified",
+            "phm24_and_bjtu_rao_benchmark_overlap_not_audited",
+        ])
     # Even a fully grounded candidate must undergo separate *actual*
     # technical and scientific review before any model predicts. This API is
     # only a metadata evidence report, never an approval system.
