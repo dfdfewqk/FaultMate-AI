@@ -44,7 +44,7 @@ def test_training_outputs_are_valid_utf8_and_cp949_decodable_ascii_json(tmp_path
     input_csv = tmp_path / "fixture.csv"
     _write_synthetic_fixture(input_csv)
     output_dir = tmp_path / "new_evaluation"
-    train(input_csv, output_dir)
+    train(input_csv, output_dir, test_fixture_only=True)
 
     before = {}
     for name in ("evaluation_report.json", "bearing_evaluated.json"):
@@ -65,5 +65,5 @@ def test_training_outputs_are_valid_utf8_and_cp949_decodable_ascii_json(tmp_path
     assert model["status"] == "evaluated_pending_review"
 
     with pytest.raises(ValueError, match="evaluation_artifacts_already_exist"):
-        train(input_csv, output_dir)
+        train(input_csv, output_dir, test_fixture_only=True)
     assert {p.name: p.read_bytes() for p in output_dir.iterdir()} == before
