@@ -150,7 +150,7 @@ def collect_readiness() -> dict:
         and readiness.get("false_positive_rate_measured") is False
         and readiness.get("overall_accuracy_measured") is False
         and readiness.get("ml_predictions_performed") is False
-        and len(readiness.get("results", [])) == 3
+        and len(readiness.get("results", [])) == 4
     )
     checks.append(_check(
         "external_healthy_evidence_honest", no_fresh_healthy,
