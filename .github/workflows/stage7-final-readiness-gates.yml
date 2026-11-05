@@ -1,0 +1,137 @@
+name: FaultMate Stage7 final offline readiness handoff + Windows/Linux/Chromium (NO release)
+on:
+  push:
+    branches:
+      - work/faultmate-stage7-final-readiness-gates-20261105
+  pull_request:
+    branches:
+      - work/faultmate-stage7-deepseek-loopback-20261105
+
+permissions:
+  contents: read
+
+jobs:
+  linux-full-and-readiness:
+    name: Linux complete Python + source compatibility + real local HTTP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing packages and test-only dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Recheck all Stage 1-7 + local real HTTP provider safety tests and JavaScript
+        run: |
+          python -m pytest -q tests
+          python -m compileall -q faultmate scripts
+          node --check web/app.js
+          PYTHONPATH=. python tests/live_http_smoke.py
+      - name: Offline final readiness report - local checks PASS but actual release BLOCKED
+        run: |
+          python scripts/preflight_final_acceptance.py --out /tmp/faultmate_stage7_readiness.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/faultmate_stage7_readiness.json', encoding='utf-8'))
+          assert d['automatic_local_checks_passed'] is True
+          assert d['release_ready'] is False
+          assert d['paid_api_requests_performed'] == 0
+          assert d['experimental_model_activated'] is False
+          assert len(d['only_user_can_complete']) == 2
+          print('LOCAL_PREFLIGHT_PASS_RELEASE_GATED_USER_STEPS_LISTED')
+          PY
+      - name: "Public dataset evidence gate: no fabricated new healthy test accuracy"
+        run: |
+          python scripts/audit_external_healthy_compatibility.py \
+            --out /tmp/faultmate_public_healthy_source_readiness.json
+          python - <<'PY'
+          import json
+          from faultmate.integration.ml import load_validated_model
+          d=json.load(open('/tmp/faultmate_public_healthy_source_readiness.json'))
+          assert d['no_approved_healthy_source'] is True
+          assert d['new_healthy_bearings_validated'] == 0
+          assert d['false_positive_rate_measured'] is False
+          assert d['overall_accuracy_measured'] is False
+          assert all(x['direct_frozen_model_prediction_allowed'] is False for x in d['results'])
+          assert load_validated_model() is None
+          print('STAGE7_HEALTHY_SOURCES_BLOCKED_NO_FABRICATED_SPECIFICITY')
+          PY
+
+  windows-python-and-launcher:
+    name: Windows whole Python + real batch start + no API transfer
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Existing Windows bootstrap (isolated CI runner)
+        shell: cmd
+        run: call setup_windows.bat
+      - name: Install test-only machine learning + HTTP test dependencies
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt pytest httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Whole Python real loopback HTTP provider safety tests and launcher smoke
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pytest -q tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe tests/windows_launcher_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Windows offline readiness report without paid API call
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/preflight_final_acceptance.py --out "$env:RUNNER_TEMP\faultmate_readiness.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content "$env:RUNNER_TEMP\faultmate_readiness.json" -Raw | ConvertFrom-Json
+          if ($r.automatic_local_checks_passed -ne $true -or $r.release_ready -ne $false -or $r.paid_api_requests_performed -ne 0) {
+            throw "Release gate or automatic readiness has an invalid state"
+          }
+          Write-Output "WINDOWS_OFFLINE_PREFLIGHT_PASS_RELEASE_NOT_READY"
+      - name: Cross-platform healthy compatibility blocks unchanged
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/audit_external_healthy_compatibility.py --out "$env:RUNNER_TEMP\healthy_readiness.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content "$env:RUNNER_TEMP\healthy_readiness.json" -Raw | ConvertFrom-Json
+          if ($report.new_healthy_bearings_validated -ne 0 -or $report.false_positive_rate_measured -ne $false) {
+            throw "falsely validated normal bearings"
+          }
+
+  chromium-existing-ui:
+    name: Chromium full P7.2 UI + attempted transfer warning and mocked agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing dependencies, browser and tests
+        run: |
+          python -m pip install -r requirements-ml.txt pytest httpx playwright
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium
+          sudo mkdir -p /mnt/data
+          sudo chown "$(id -u):$(id -g)" /mnt/data
+      - name: Regression on each existing screen and Stage6 connected user path
+        run: |
+          for test in \
+            tests/browser_smoke.py tests/browser_step1.py tests/browser_step2.py \
+            tests/browser_step3.py tests/browser_step4.py tests/browser_step5.py \
+            tests/browser_final_integration.py tests/browser_stage6_integrated.py; do
+            PYTHONPATH=. python "$test" || exit 1
+          done
