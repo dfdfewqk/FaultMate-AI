@@ -118,7 +118,7 @@ def test_train_pipeline_group_split_and_release_gate(tmp_path):
                     vibration_rms_m_s2=scale+trial*.08, vibration_peak_m_s2=scale*2+trial*.08,
                     current_rms_a=scale*.2+trial*.01,label=label,
                     label_provenance=f'fixture_{index}',license='test-only'))
-    report=train(path,tmp_path/'out')
+    report=train(path,tmp_path/'out',test_fixture_only=True)
     model=json.loads((tmp_path/'out'/'bearing_evaluated.json').read_text())
     assert model['status']=='evaluated_pending_review'
     assert not (tmp_path/'out'/'bearing_validated.json').exists()
