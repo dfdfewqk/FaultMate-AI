@@ -108,7 +108,7 @@ async def exercise_real_windows_chromium(base: str) -> dict:
             diagnosis_text = await page.locator("#triage-result").inner_text()
             assert "고장 원인을 확정하지 않았습니다" in diagnosis_text
 
-            await page.locator("#integration-panel summary").click()
+            await page.locator("#integration-panel > summary").click()
             assert "미연결" in await page.locator("#integration-ml").inner_text()
             assert await page.locator("#agent-run").is_disabled()
             await page.locator("#agent-preview").click()
@@ -150,6 +150,7 @@ async def exercise_real_windows_chromium(base: str) -> dict:
             # This fixture is NOT independently verified original sensor data;
             # the real original K001 source is checked by its own CI job.
             from test_experimental_paderborn_real_inference import fake_source_feature_report
+            await page.locator("#research-json-advanced summary").click()
             await page.locator("#research-upload").set_input_files({
                 "name": "synthetic_80_record_research.json",
                 "mimeType": "application/json",
@@ -164,12 +165,26 @@ async def exercise_real_windows_chromium(base: str) -> dict:
             assert "원본 측정파일의 진위를 검증할 수 없습니다" in research_text
             assert "현장 고장 확률" in research_text
 
+            # Direct original RAR route is separate and no fake small upload
+            # can be presented as verified original Paderborn sensor data.
+            await page.locator("#raw-rar-upload").set_input_files({
+                "name": "K001.rar", "mimeType": "application/octet-stream",
+                "buffer": b"NOT_AN_ORIGINAL_100_MB_RAR",
+            })
+            assert await page.locator("#raw-rar-run").is_enabled()
+            await page.locator("#raw-rar-run").click()
+            await page.wait_for_function(
+                "document.querySelector('#raw-rar-feedback').textContent.includes('100MB')")
+            assert not (await page.locator("#raw-rar-result").inner_text()).strip()
+
             # Safety-hold must hide stale results and disable both optional AI/ML.
             await page.locator("#triage-hazard").select_option("yes")
             assert await page.locator("#agent-preview").is_disabled()
             assert await page.locator("#agent-run").is_disabled()
             assert await page.locator("#ml-run").is_disabled()
             assert await page.locator("#research-run").is_disabled()
+            assert await page.locator("#raw-rar-run").is_disabled()
+            assert not (await page.locator("#raw-rar-result").inner_text()).strip()
             assert not (await page.locator("#research-result").inner_text()).strip()
             assert "긴급 위험 징후" in await page.locator("#triage-result").inner_text()
 

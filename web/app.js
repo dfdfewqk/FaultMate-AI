@@ -933,4 +933,106 @@
       }
     }
   });
+  // Optional research-only direct original source upload.
+  // No original signal leaves localhost. The backend rechecks archive MD5,
+  // the full original 80 MAT records and the pinned frozen science model.
+  const rawRarInput = document.getElementById('raw-rar-upload');
+  const rawRarRun = document.getElementById('raw-rar-run');
+  const rawRarFeedback = document.getElementById('raw-rar-feedback');
+  const rawRarResult = document.getElementById('raw-rar-result');
+  const maxOriginalRar = 768 * 1024 * 1024;
+  let rawRarVersion = 0;
+  let rawRarController = null;
+  function invalidateRawRar(message) {
+    ++rawRarVersion;
+    if (rawRarController) {
+      rawRarController.abort();
+      rawRarController = null;
+    }
+    rawRarResult.replaceChildren();
+    rawRarFeedback.textContent = message;
+    rawRarInput.disabled = triageHazard.value === 'yes';
+    rawRarRun.disabled = triageHazard.value === 'yes' ||
+      !(rawRarInput.files && rawRarInput.files.length);
+  }
+  rawRarInput.addEventListener('change', () => invalidateRawRar(
+    '원본 파일이 바뀌었습니다. 실행하면 로컬에서 원저자 MD5와 80개 MAT를 다시 확인합니다.'));
+  triageHazard.addEventListener('change', () => invalidateRawRar(
+    triageHazard.value === 'yes'
+      ? '긴급 위험: 화면의 ML 결과를 숨겼습니다. 이미 시작된 로컬 파일 검사는 종료될 때까지 이어질 수 있습니다.'
+      : '원본 베어링 RAR을 선택하면 임시 파일로 검증하고 연구용 ML 점수를 표시합니다.'));
+  rawRarRun.disabled = true;
+  rawRarInput.disabled = triageHazard.value === 'yes';
+
+  rawRarRun.addEventListener('click', async () => {
+    if (rawRarRun.disabled || triageHazard.value === 'yes') return;
+    const file = rawRarInput.files && rawRarInput.files[0];
+    const validName = file && /^([a-z]{1,2}\d{2,3})\.rar$/i.exec(file.name);
+    if (!validName || file.size < 100000000 || file.size > maxOriginalRar) {
+      invalidateRawRar('100MB 이상·768MiB 이하인 공식 Paderborn 베어링 RAR 파일을 선택하세요.');
+      return;
+    }
+    const asset = validName[1].toUpperCase();
+    const version = ++rawRarVersion;
+    const controller = new AbortController();
+    rawRarController = controller;
+    rawRarResult.replaceChildren();
+    rawRarRun.disabled = true;
+    rawRarFeedback.textContent =
+      '원본을 로컬 서버에 전달하고 MD5·80개 진동/전류 MAT·고정 ML을 검증 중입니다. 새 파일을 선택하지 마세요.';
+    try {
+      const res = await fetch('/api/ml/experimental-original-rar', {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/octet-stream',
+          'X-FaultMate-Bearing-ID':asset,
+        },
+        body:file, cache:'no-store',signal:controller.signal,
+      });
+      const result = await res.json();
+      if (version !== rawRarVersion || controller.signal.aborted ||
+          triageHazard.value === 'yes') return;
+      if (!res.ok) {
+        rawRarFeedback.textContent =
+          res.status === 409 ? '다른 원본 분석이 진행 중입니다. 완료 후 다시 실행하세요.' :
+          res.status === 413 ? '최대 768MiB 파일 크기를 넘었습니다.' :
+          res.status === 507 ? '로컬 임시 저장 공간이 부족해 검사를 중단했습니다.' :
+          '원본 RAR 형식·종류 또는 요청을 확인할 수 없습니다. 예측하지 않았습니다.';
+        return;
+      }
+      rawRarFeedback.textContent = result.message ||
+        '원본 데이터의 검증에 실패하여 예측하지 않았습니다.';
+      if (result.status === 'experimental_unapproved' &&
+          result.research_inference_performed === true &&
+          result.original_rar_md5_verified_in_this_request === true &&
+          result.source_mat_files_actually_read_this_run === 80 &&
+          result.model_approved_for_runtime === false &&
+          result.confirmed_fault === false && result.safe_to_work === false &&
+          (result.experimental_predicted_label === 'healthy' ||
+           result.experimental_predicted_label === 'damaged') &&
+          typeof result.experimental_damage_model_score === 'number') {
+        add(rawRarResult,'h4','원본 RAR 실측 검증 + 연구용 ML · 미승인');
+        add(rawRarResult,'p',
+          result.bearing_id + ' / 실험 분류: ' +
+          (result.experimental_predicted_label === 'healthy' ? '정상 쪽' : '손상 쪽') +
+          ' / 모델 손상 판별 점수 ' +
+          result.experimental_damage_model_score.toFixed(4), 'result-note');
+        add(rawRarResult,'p',
+          '원본 MD5 확인 · 실제 MATLAB 측정 80회 · 중복 제외 후 ' +
+          result.source_unique_signal_pairs + '개', 'small-note');
+        add(rawRarResult,'p',
+          '이 베어링은 기존 학습에 사용되었을 수 있습니다. 독립 정상 베어링 오경보율·현장 정확도 미검증. ' +
+          '실제 설비 고장 확정·고장 확률·작업 허가 아님.', 'result-hold');
+      }
+    } catch (_e) {
+      if (version === rawRarVersion && !controller.signal.aborted)
+        rawRarFeedback.textContent = '로컬 원본 분석 요청이 중단되거나 실패했습니다. 업로드가 이미 끝났다면 서버 검사가 이어질 수 있습니다.';
+    } finally {
+      if (version === rawRarVersion) {
+        rawRarController = null;
+        rawRarRun.disabled = triageHazard.value === 'yes' ||
+          !(rawRarInput.files && rawRarInput.files.length);
+      }
+    }
+  });
 })();
