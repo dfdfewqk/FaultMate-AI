@@ -192,3 +192,20 @@ def test_any_fit_on_same_heldout_bearing_rejected(tmp_path):
     assets = provenance["dev_assets"]
     with pytest.raises(ValueError, match="evaluation_asset_leakage"):
         _predict(rows, assets, assets[0], CANDIDATES[1])
+
+
+def test_committed_real_dev_model_exactly_matches_successful_actions_artifact():
+    # SHA256 of development_aggregated_unapproved.json in real run 41969444944.
+    # Prevent hand-transcription errors or quietly swapping research coefficients.
+    p = (CATALOG.parents[1] / "docs" / "experiments" /
+         "PADERBORN_BEARING_AGGREGATED_UNAPPROVED_20261105.json")
+    exact_bytes = p.read_bytes()
+    assert hashlib.sha256(exact_bytes).hexdigest() == (
+        "84a7c059fa769d1b0e2bd0075ecba92bcd06ae24acf961e0ea2120d9d44a0ab0"
+    )
+    data = json.loads(exact_bytes)
+    assert data["status"] == "experimental_unapproved_not_for_runtime"
+    assert data["approved_for_runtime"] is False
+    assert data["runtime_inference_compatible"] is False
+    assert data["source_numeric_si_units_verified"] is False
+    assert set(data["training_asset_ids"]).isdisjoint(PREVIOUSLY_OPENED_TEST_BEARINGS)
