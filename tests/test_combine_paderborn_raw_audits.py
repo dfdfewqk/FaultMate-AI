@@ -248,3 +248,26 @@ def test_same_mat_bytes_cannot_claim_different_raw_sensor_fingerprint(tmp_path):
     path.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(SourceAuditError, match="same_mat_sha256_different_raw_fingerprint"):
         combine_audits(folder)
+
+
+def test_windows_crlf_source_catalog_hash_accepted_on_linux(tmp_path):
+    """Same repository catalog with Windows CRLF checkout is not spoofed data."""
+    folder, path, report = _setup(tmp_path, "K001")
+    normalized = CATALOG.read_bytes().replace(b"\\r\\n", b"\\n")
+    windows = normalized.replace(b"\\n", b"\\r\\n")
+    report["source_catalog_sha256"] = hashlib.sha256(windows).hexdigest()
+    path.write_text(json.dumps(report), encoding="utf-8")
+    result = combine_audits(folder)
+    assert result["verified_independent_bearings"] == 1
+    assert result["cohort_raw_audit_complete"] is False
+    assert result["training_permitted"] is False
+
+
+def test_catalog_hash_other_than_same_lf_crlf_content_rejected(tmp_path):
+    folder, path, report = _setup(tmp_path, "K001")
+    report["source_catalog_sha256"] = hashlib.sha256(
+        CATALOG.read_bytes() + b"\\n# forged addition"
+    ).hexdigest()
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(SourceAuditError, match="source_provenance_invalid"):
+        combine_audits(folder)
