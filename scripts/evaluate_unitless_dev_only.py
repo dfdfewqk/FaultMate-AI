@@ -107,25 +107,33 @@ def verified_dev_rows(feature_dir: Path, audit_dir: Path, baseline: Path,
             raise SourceAuditError("original_real_source_blob_sha_mismatch:" + asset)
         feat = json.loads(feat_path.read_text(encoding="utf-8"))
         audit = json.loads(audit_path.read_text(encoding="utf-8"))
-        if (feat.get("schema") != SCHEMA or feat.get("bearing_id") != asset
-            or feat.get("status") != "real_raw_unitless_features_unreviewed"
-            or feat.get("dataset") != "paderborn_bearing_datacenter"
-            or feat.get("label") != catalog[asset]["label"]
-            or feat.get("license") != "CC BY-NC 4.0"
-            or feat.get("source_catalog_sha256") != catalog_sha
-            or feat.get("official_archive_md5") != catalog[asset]["md5"]
-            or feat.get("archive_verified") is not True
-            or feat.get("raw_si_units_verified") is not False
-            or feat.get("si_amplitudes_used") is not False
-            or feat.get("approved_for_runtime") is not False
-            or list(feat.get("feature_names", [])) != list(FEATURE_NAMES)
-            or audit.get("bearing_id") != asset
-            or audit.get("label") != catalog[asset]["label"]
-            or audit.get("source_md5_verified") is not True
-            or audit.get("source_archive_md5") != catalog[asset]["md5"]
-            or audit.get("raw_units_verified") is not False
-            or audit.get("approved_for_training") is not False):
-            raise SourceAuditError("original_source_fields_invalid:" + asset)
+        # Named assertions preserve the same strict gates and identify which
+        # source metadata check failed without disclosing any raw measurement.
+        checks = {
+            "schema": feat.get("schema") == SCHEMA,
+            "bearing_id": feat.get("bearing_id") == asset,
+            "feature_status": feat.get("status") == "real_raw_unitless_features_unreviewed",
+            "dataset": feat.get("dataset") == "paderborn_bearing_datacenter",
+            "label": feat.get("label") == catalog[asset]["label"],
+            "license": feat.get("license") == "CC BY-NC 4.0",
+            "catalog_sha": feat.get("source_catalog_sha256") == catalog_sha,
+            "archive_md5": feat.get("official_archive_md5") == catalog[asset]["md5"],
+            "archive_verified": feat.get("archive_verified") is True,
+            "raw_si_unverified": feat.get("raw_si_units_verified") is False,
+            "si_amplitudes_not_claimed": feat.get("si_amplitudes_used") is False,
+            "model_not_approved": feat.get("approved_for_runtime") is False,
+            "feature_names": list(feat.get("feature_names", [])) == list(FEATURE_NAMES),
+            "audit_asset": audit.get("bearing_id") == asset,
+            "audit_label": audit.get("label") == catalog[asset]["label"],
+            "audit_source_md5": audit.get("source_md5_verified") is True,
+            "audit_archive_md5": audit.get("source_archive_md5") == catalog[asset]["md5"],
+            "audit_raw_si_unverified": audit.get("raw_units_verified") is False,
+            "audit_not_training_approved": audit.get("approved_for_training") is False,
+        }
+        bad = [name for name, valid in checks.items() if not valid]
+        if bad:
+            raise SourceAuditError(
+                "original_source_fields_invalid:" + asset + ":" + ",".join(bad))
         records = feat.get("records")
         audits = audit.get("recordings")
         if (not isinstance(records, list) or len(records) != 80
