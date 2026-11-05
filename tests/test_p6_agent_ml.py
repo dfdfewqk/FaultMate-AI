@@ -125,3 +125,10 @@ def test_train_pipeline_group_split_and_release_gate(tmp_path):
     groups=json.loads((tmp_path/'out'/'evaluation_report.json').read_text())['partition_by_asset']
     assert len(groups)==12 and set(groups.values())=={'train','validation','test'}
     assert 'heldout_macro_f1' in report
+    # A bearing, not a recording, is the independent test unit.
+    assert 'heldout_bearing_macro_f1' in report
+    assert len(report['heldout_bearing_predictions']) == report['test_asset_count']
+    assert sum(map(sum, report['heldout_bearing_confusion_matrix'])) == report['test_asset_count']
+    assert report['heldout_bearing_damage_missed_count'] >= 0
+    assert report['heldout_bearing_false_damage_alarm_count'] >= 0
+    assert model['provenance_check'] == {'status': 'synthetic_software_test_only'}
