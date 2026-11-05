@@ -36,6 +36,28 @@ Manifest structure, SOFTWARE FIXTURE EXAMPLE ONLY (not a genuine Paderborn calib
 
 **Never copy the fixture values into a real manifest.** 1.0 would imply the stored values were already SI, which remains unverified for the real dataset. Other numerical multipliers are possible only if the source documentation establishes the complete capture-chain gains. A SHA256 and reviewer text provide traceability; the tool cannot establish the scientific truth of a cited document. Without genuine reviewed evidence, conversion must remain blocked.
 
+### Affine calibration and zero-reference fields (2026-11-05 extension)
+
+To avoid treating analog voltage reference as motor current, the review MUST
+add these four parameters for both channels:
+
+- vibration_stored_unit: the input unit used by stored MAT Y.Data
+  (m/s², m/s^2, g, V or mV).
+- current_stored_unit: input A, V or mV.
+- vibration_offset_in_stored_unit: explicit finite zero offset, even if 0.
+- current_offset_in_stored_unit: explicit finite zero offset, even if 0.
+
+These inputs are in ADDITION to the existing source/evidence hashes,
+dataset-specific review notes and scale factors above. The physical mapping
+is (stored numeric sample - raw input offset) * reviewed SI scale, applied
+before calculating RMS or peak. Metadata explicitly declaring SI units cannot
+be altered with arbitrary offsets/scales; g conversion requires 9.80665
+m/s² per g. The manufacturer's nominal 2.5 V reference is NOT proof that
+the original Paderborn stored MAT signals are voltages or have that offset.
+
+Detailed source comparison and evidence still missing:
+docs/SENSOR_CALIBRATION_FINDINGS_20261105.md
+
 Example after documentary proof is obtained:
 ```powershell
 & ".\.venv-ml\Scripts\python.exe" scripts/convert_mat_to_csv.py --mat "data\raw\K001\N15_M07_F10_K001_1.mat" --asset-id K001 --trial-id N15_M07_F10_1 --source-id paderborn-bearing-datacenter --label healthy --label-provenance "verified official paper" --unit-manifest review.json --unit-evidence-document original-confirmation.pdf --output data\converted\verified-record.csv
