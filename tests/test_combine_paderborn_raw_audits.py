@@ -156,3 +156,19 @@ def test_bad_record_source_identity_rejected(tmp_path):
     path.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(SourceAuditError, match="recording_identity_invalid"):
         combine_audits(folder)
+
+
+def test_missing_recorded_channel_name_rejected(tmp_path):
+    folder, path, report = _setup(tmp_path, "KA04")
+    report["recordings"][0].pop("vibration_channel")
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(SourceAuditError, match="recording_channels_or_raw_units_missing"):
+        combine_audits(folder)
+
+
+def test_boolean_archive_size_not_counted_as_real_size(tmp_path):
+    folder, path, report = _setup(tmp_path, "K001")
+    report["source_archive_size_bytes"] = True
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(SourceAuditError, match="source_provenance_invalid"):
+        combine_audits(folder)
