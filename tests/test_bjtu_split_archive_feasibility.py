@@ -188,3 +188,44 @@ def test_cli_never_overwrites_existing_evidence(tmp_path):
     preserved = output.read_bytes()
     assert p.main(["--out", str(output)]) == 2
     assert output.read_bytes() == preserved
+
+
+
+@pytest.mark.parametrize("url", [
+    "http://drive.usercontent.google.com/download?id=ABCD",
+    "https://evil.example/uc?id=ABCD",
+    "https://drive.usercontent.google.com.evil.example/download?id=ABCD",
+    "https://evil.googleusercontent.com.evil.example/download",
+    "https://user@drive.google.com/uc?id=ABCDEFGHIJKLMNO",
+    "https://drive.google.com:8080/uc?id=ABCDEFGHIJKLMNO",
+])
+def test_archive_redirect_never_leaves_verified_google_https_domains(url):
+    assert p._is_verified_google_download_host(url) is False
+
+
+def test_exact_google_owned_signed_redirect_preserves_head_and_range():
+    assert p._is_verified_google_download_host(
+        "https://drive.usercontent.google.com/download?id=ABCDEFGHIJKLMNO") is True
+    from urllib.request import Request
+    original = Request(
+        "https://drive.google.com/uc?id=ABCDEFGHIJKLMNO",
+        headers={"Range": "bytes=0-0"}, method="GET")
+    redirect = p._GoogleOnlyRedirects()
+    followed = redirect.redirect_request(
+        original, None, 303, "See Other", {},
+        "https://drive.usercontent.google.com/download?id=ABCDEFGHIJKLMNO")
+    assert followed is not None
+    assert followed.get_method() == "GET"
+    assert followed.get_header("Range") == "bytes=0-0"
+    assert redirect.hops == 1
+    blocked = redirect.redirect_request(
+        followed, None, 303, "See Other", {}, "https://attacker.example/raw")
+    assert blocked is None
+    assert redirect.hops == 1
+    second = redirect.redirect_request(
+        followed, None, 302, "Next", {},
+        "https://rr1.googleusercontent.com/safe")
+    assert second is not None
+    assert redirect.hops == 2
+    assert redirect.redirect_request(second, None, 302, "No third redirect",
+                                     {}, "https://drive.google.com/uc?id=ABC") is None
