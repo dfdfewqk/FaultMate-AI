@@ -7,7 +7,7 @@
 - [Oxford Academic, Generalizable fault detection and diagnosis (2026)](https://academic.oup.com/tse/article/8/2/tdag011/8644296): PHM24 9개 조건·64 kHz 진동/전류·정상/고장 상태 출처.
 - [Emerald, unsupervised domain adaptation (2025)](https://doi.org/10.1108/SRT-11-2024-0017): PHM24/BJTU의 3개 학습 조건 + 6개 다른 평가 조건, 21개 동기 측정 채널(3상 전류 포함) 설명.
 - [비공식 재현 매핑 연구](https://github.com/jonathanadamrico/BJTU_PHM_Beijing_Benchmark): PHM Beijing 대회 자료가 BJTU-RAO 원본의 일부와 중복될 수 있음을 지적한다. 이 저장소의 **MIT 라이선스는 소스 코드 라이선스일 뿐 원본 데이터 재배포·상업사용 권리를 보장하지 않는다**.
-- 공신력 있는 **새로운 정상 물리 베어링 개별 ID, 신호 원본 SHA/공식 체크섬, 독립 원본 수, 데이터 라이선스, 대회 원본 접근 가능 여부**는 아직 확인되지 않았다. 연구 논문의 본문 라이선스도 원본 데이터 사용 허가로 간주하지 않는다.
+- [원저자 IEEE Access 원본 데이터 안내(2025)](https://doi.org/10.1109/ACCESS.2025.3551603)에 **원본 배포 링크**가 기재되어 있다: [Google Drive 폴더](https://drive.google.com/drive/folders/1RlZvFw-v07VvsL2Ni9cS7iFrTPDIhn2r?usp=sharing) 및 [Baidu Netdisk](https://pan.baidu.com/s/1S5F8URapHPArX2mV6FzDfA?pwd=9t74). 다만 **배포 링크의 존재와 실제 파일 다운로드/원본 검증은 다르다.** 이번 작업에서는 폴더 속 개별 원본을 받거나 검사하지 않았고, 공신력 있는 **정상 물리 베어링 개별 ID, 원본 SHA/공식 체크섬, 실제 독립 개체 수, 데이터 라이선스**는 아직 확인되지 않았다. 논문의 CC BY 라이선스도 원본 데이터 사용 허가로 간주하지 않는다.
 
 ## 데이터 적합성 판단
 
@@ -21,7 +21,8 @@
 | 베어링 1개당 80회 원본 기록/라벨 | 미검증 |
 | 별개의 실제 정상 물리 베어링 ID | 미확인 |
 | 원본 RAR/MAT/원신호 체크섬 검증 | 미수행 |
-| 공식 배포 조건과 라이선스 | 미확인 |
+| 원저자 배포 링크 존재 | **논문에 Google Drive·Baidu 링크 확인**, 개별 파일 접근/무결성 검사 미실시 |
+| 공식 원본 데이터 이용 라이선스 | **미확인** (논문 자체의 CC BY와 구분) |
 | 기존 Paderborn frozen 모델 직접 평가 | **불가 — 계약 불일치** |
 
 **결론:** PHM24/BJTU-RAO는 **연구 가치가 있는 새로운 외부 도메인 후보**지만, 기존 Paderborn에서 개발한 12차원 무차원 특징 모델에 단순히 정상 데이터를 넣어 오경보율을 산출해서는 안 된다. 원본 자료 확보 후에도 **별도 장비·수집 조건 모델의 외부 도메인 검증 및 독립 자산 분할**이 먼저 필요하다.
