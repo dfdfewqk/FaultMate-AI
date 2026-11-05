@@ -86,6 +86,7 @@ def make_fixture(tmp_path):
             "bearing_id": asset, "label": label,
             "source_md5_verified": True,
             "source_archive_md5": catalog[asset]["md5"],
+            "source_catalog_sha256": hashlib.sha256(CATALOG.read_bytes()).hexdigest(),
             "raw_units_verified": False,
             "approved_for_training": False,
             "inspected_recordings": 80, "recordings": source_records,
