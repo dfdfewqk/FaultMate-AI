@@ -142,6 +142,22 @@ async def ml_inspect(request: Request, response: Response):
     return inspect_csv(bytes(data))
 
 
+@app.post("/api/ml/experimental-original-rar")
+async def experimental_original_rar(request: Request, response: Response):
+    """Local, single-flight original RAR input -> 80 MAT -> frozen research ML."""
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
+    try:
+        from faultmate.integration.research_raw_archive import inspect_original_rar
+        return await inspect_original_rar(request)
+    except (ImportError, ModuleNotFoundError):
+        return {
+            "status": "unavailable", "research_inference_performed": False,
+            "confirmed_fault": False, "safe_to_work": False,
+            "message": "원본 RAR 분석에 필요한 Python 연구용 의존성이 없습니다.",
+        }
+
+
 @app.post("/api/ml/experimental-unitless-report")
 async def research_unitless_report(request: Request, response: Response):
     """Research-only scoring from 80 declared dimensionless source features.
