@@ -22,6 +22,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from scripts.audit_paderborn_assets import CATALOG, validate_catalog
 
+MIN_ORIGINAL_RAR_BYTES = 100_000_000
 MAX_ORIGINAL_RAR_BYTES = 768 * 1024 * 1024
 MIN_EXTRA_DISK_BYTES = 256 * 1024 * 1024
 READABLE_BEARING = re.compile(r"^[A-Z]{1,2}\d{2,3}$")
@@ -133,14 +134,23 @@ async def inspect_original_rar(request: Request) -> dict:
                         raise HTTPException(status_code=413, detail="original_rar_exceeds_streaming_limit")
                     if chunk:
                         out.write(chunk)
-            if not 100_000_000 <= size <= MAX_ORIGINAL_RAR_BYTES:
+            if not MIN_ORIGINAL_RAR_BYTES <= size <= MAX_ORIGINAL_RAR_BYTES:
                 raise HTTPException(status_code=422, detail="original_rar_source_size_invalid")
             if declared is not None and declared != size:
                 raise HTTPException(status_code=400, detail="original_rar_content_length_mismatch")
             # Use worker thread: browser and normal rule-based endpoints remain
             # responsive during expensive original MAT processing.
             try:
-                return await asyncio.to_thread(_research_score, archive, asset)
+                # A browser abort/connection loss must NOT remove the temp RAR
+                # and release the exclusive lock while the 7z thread still
+                # reads it. Finish the read-only local check before cleanup.
+                worker = asyncio.create_task(
+                    asyncio.to_thread(_research_score, archive, asset))
+                try:
+                    return await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    await asyncio.shield(worker)
+                    raise
             except (OSError, ValueError, TypeError, KeyError, RuntimeError,
                     ImportError, ModuleNotFoundError):
                 # Do not echo temporary path, source bytes, archive exception
