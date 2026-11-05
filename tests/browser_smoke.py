@@ -114,7 +114,7 @@ async def run():
         # New P6 browser controls: consent-gated context review and fail-closed ML.
         await page.locator("#triage-equipment").select_option("컨베이어")
         await page.locator("#triage-case").select_option("CONV-001")
-        await page.locator("#integration-panel summary").click()
+        await page.locator("#integration-panel > summary").click()
         await page.locator("#agent-preview").click()
         await page.locator("#agent-preview-content:not([hidden])").wait_for(timeout=5000)
         preview_text = await page.locator("#agent-preview-content").inner_text()
