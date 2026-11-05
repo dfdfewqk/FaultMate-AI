@@ -56,15 +56,24 @@ class _BlockProviderRedirects(urlrequest.HTTPRedirectHandler):
         raise ValueError("upstream_redirect_blocked")
 
 
-def _invoke_deepseek(context: dict, api_key: str) -> dict:
-    # An unexpectedly large local context must not be shipped to a paid API.
+def _chat_completion_body(context: dict) -> bytes:
+    """Exactly the bytes used for live DeepSeek HTTP POST, without any key.
+
+    Shared by the actual transport and the offline preflight: schema previews
+    cannot diverge from the paid request body. This pure helper does not call
+    network APIs or read environment secrets.
+    """
     context_wire = agent_context_wire(context)
-    if len(context_wire.encode("utf-8")) > 64 * 1024:
-        raise ValueError("agent_context_too_large")
-    body = json.dumps({'model':MODEL,'thinking':{'type':'disabled'},'messages':[
+    if len(context_wire.encode('utf-8')) > 64 * 1024:
+        raise ValueError('agent_context_too_large')
+    return json.dumps({'model':MODEL,'thinking':{'type':'disabled'},'messages':[
         {'role':'system','content':SYSTEM},
         {'role':'user','content':'Sort the following unverified local evidence. Output JSON only:\n' + context_wire},
     ],'response_format':{'type':'json_object'},'stream':False,'max_tokens':MAX_COMPLETION_TOKENS},ensure_ascii=False).encode('utf-8')
+
+
+def _invoke_deepseek(context: dict, api_key: str) -> dict:
+    body = _chat_completion_body(context)
     req = urlrequest.Request(ENDPOINT,data=body,method='POST',headers={
         'Authorization':'Bearer '+api_key,'Content-Type':'application/json','Accept':'application/json',
     })
