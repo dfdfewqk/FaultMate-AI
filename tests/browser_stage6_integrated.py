@@ -109,6 +109,25 @@ async def run():
                 assert "원인 미확정" in await page.locator("#agent-result").inner_text()
                 assert await page.locator("#agent-run").is_disabled()
 
+                # Mock the provider failing AFTER a request was attempted.
+                # The UI must NOT claim the provider received no evidence.
+                def fake_provider_error(context, key):
+                    raise RuntimeError("PRIVATE_MOCK_PROVIDER_DIAGNOSTIC_NEVER_ECHO")
+                agent._invoke_deepseek = fake_provider_error
+                await page.locator("#agent-preview").click()
+                await page.locator("#agent-preview-content:not([hidden])").wait_for()
+                await page.locator("#agent-consent").check()
+                await page.locator("#agent-run").click()
+                await page.wait_for_function(
+                    "document.querySelector('#agent-feedback').textContent.includes('전송 여부 확인 불가')")
+                assert "전송 여부 확인 불가" in await page.locator("#agent-feedback").inner_text()
+                assert "PRIVATE_MOCK_PROVIDER_DIAGNOSTIC" not in await page.locator("#agent-result").inner_text()
+                assert await page.locator("#agent-run").is_disabled()
+                assert not await page.locator("#agent-consent").is_checked()
+                assert len(invocations) == 1
+                assert requests.count(("POST", "/api/agent/review")) == 2
+                agent._invoke_deepseek = fake_invoke
+
                 await page.locator("#ml-upload").set_input_files({
                     "name": "source.csv", "mimeType": "text/csv",
                     "buffer": (b"asset_id,trial_id,source_id,vibration_rms_m_s2,vibration_peak_m_s2,current_rms_a\n"
