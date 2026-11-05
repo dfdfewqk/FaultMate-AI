@@ -253,8 +253,8 @@ def test_same_mat_bytes_cannot_claim_different_raw_sensor_fingerprint(tmp_path):
 def test_windows_crlf_source_catalog_hash_accepted_on_linux(tmp_path):
     """Same repository catalog with Windows CRLF checkout is not spoofed data."""
     folder, path, report = _setup(tmp_path, "K001")
-    normalized = CATALOG.read_bytes().replace(b"\\r\\n", b"\\n")
-    windows = normalized.replace(b"\\n", b"\\r\\n")
+    normalized = CATALOG.read_bytes().replace(b"\r\n", b"\n")
+    windows = normalized.replace(b"\n", b"\r\n")
     report["source_catalog_sha256"] = hashlib.sha256(windows).hexdigest()
     path.write_text(json.dumps(report), encoding="utf-8")
     result = combine_audits(folder)
