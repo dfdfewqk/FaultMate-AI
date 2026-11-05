@@ -1,0 +1,69 @@
+name: FaultMate consolidated development regression (NO packaging)
+on:
+  push:
+    branches:
+      - work/faultmate-final-integration-20261105
+    paths:
+      - .github/workflows/final-development-regression.yml
+      - faultmate/**
+      - scripts/**
+      - tests/**
+      - setup_windows.bat
+      - start_windows.bat
+      - requirements.txt
+      - requirements-ml.txt
+  pull_request:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
+
+permissions:
+  contents: read
+
+jobs:
+  python-safety:
+    name: Python integration, API boundary and test data guards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared scientific and test dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: All P7.2 AI and ML Python regression tests
+        run: python -m pytest -q tests
+      - name: Syntax verification and real HTTP server smoke
+        run: |
+          python -m compileall -q faultmate scripts
+          PYTHONPATH=. python tests/live_http_smoke.py
+      - name: Confirm raw audit CLI is read-only and has a parser
+        run: python scripts/audit_paderborn_raw_recordings.py --help
+
+  windows-safety:
+    name: Native Windows BAT to localhost, no paid AI, no trained model
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Existing isolated Windows dependency bootstrap
+        shell: cmd
+        run: call setup_windows.bat
+      - name: Install test-only dependencies into ephemeral runner
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt pytest httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full integrated Python regression on Windows
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pytest -q tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real start_windows.bat integration and safety smoke
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe tests/windows_launcher_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
