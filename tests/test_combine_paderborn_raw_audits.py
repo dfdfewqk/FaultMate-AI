@@ -172,3 +172,79 @@ def test_boolean_archive_size_not_counted_as_real_size(tmp_path):
     path.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(SourceAuditError, match="source_provenance_invalid"):
         combine_audits(folder)
+
+
+def test_all_twelve_partial_reports_cannot_be_marked_complete(tmp_path):
+    """Twelve JSON documents, each with only two trials, are NOT 960 samples."""
+    catalog = json.loads(CATALOG.read_text())["assets"]
+    folder = tmp_path / "partial"
+    folder.mkdir()
+    for asset in catalog:
+        report = _fake_report(asset["id"], label=asset["label"], md5=asset["md5"], signal=asset["id"])
+        (folder / f'{asset["id"]}.json').write_text(json.dumps(report), encoding="utf-8")
+    output = combine_audits(folder)
+    assert output["verified_independent_bearings"] == 12
+    assert output["inspected_recordings"] == 24
+    assert output["cohort_raw_audit_complete"] is False
+    assert output["status"] == "raw_audit_partial"
+    assert output["fully_audited_bearings"] == 0
+    assert len(output["bearings_with_incomplete_recordings"]) == 12
+    assert output["minimum_bearing_counts_met"] is False
+    assert output["training_permitted"] is False
+
+
+def test_full_synthetic_12_by_80_cohort_is_only_a_raw_audit(tmp_path):
+    """Coverage logic test: all hashes and sensor values are SYNTHETIC."""
+    import hashlib
+    from scripts.audit_paderborn_assets import OFFICIAL_CONDITIONS
+    catalog = json.loads(CATALOG.read_text())["assets"]
+    folder = tmp_path / "complete"
+    folder.mkdir()
+    for asset in catalog:
+        code = asset["id"]
+        report = _fake_report(code, label=asset["label"], md5=asset["md5"], signal=code)
+        records = []
+        for condition in sorted(OFFICIAL_CONDITIONS):
+            for trial in range(1, 21):
+                seed = f"{condition}/{code}/{trial}"
+                records.append({
+                    "recording": f"{condition}_{code}_{trial}.mat",
+                    "mat_sha256": hashlib.sha256(("mat/" + seed).encode()).hexdigest(),
+                    "raw_signal_fingerprint": hashlib.sha256(("signal/" + seed).encode()).hexdigest(),
+                    "sample_count": 256001,
+                    "vibration_channel": "vibration_1",
+                    "current_channel": "phase_current_1",
+                    "raw_vibration_unit": "unknown",
+                    "raw_current_unit": "unknown",
+                    "raw_rms_vibration_unscaled": 1.0,
+                    "raw_peak_abs_vibration_unscaled": 2.0,
+                    "raw_rms_current_unscaled": 0.5,
+                    "condition": condition,
+                    "trial": trial,
+                    "duplicate_of": None,
+                })
+        report["recordings"] = records
+        report["inspected_recordings"] = 80
+        report["unique_raw_signals"] = 80
+        report["duplicate_raw_recordings"] = []
+        (folder / f"{code}.json").write_text(json.dumps(report), encoding="utf-8")
+    output = combine_audits(folder)
+    assert output["cohort_raw_audit_complete"] is True
+    assert output["status"] == "raw_archives_audited_calibration_unverified"
+    assert output["verified_independent_bearings"] == 12
+    assert output["fully_audited_bearings"] == 12
+    assert output["recording_inventory_expected"] == 960
+    assert output["inspected_recordings"] == 960
+    assert output["verified_by_label"] == {"healthy": 6, "damaged": 6}
+    assert output["fully_audited_by_label"] == {"healthy": 6, "damaged": 6}
+    assert output["minimum_bearing_counts_met"] is True
+    assert output["training_permitted"] is False
+    assert output["physical_units_verified"] is False
+
+
+def test_same_mat_bytes_cannot_claim_different_raw_sensor_fingerprint(tmp_path):
+    folder, path, report = _setup(tmp_path, "K001")
+    report["recordings"][1]["mat_sha256"] = report["recordings"][0]["mat_sha256"]
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(SourceAuditError, match="same_mat_sha256_different_raw_fingerprint"):
+        combine_audits(folder)
