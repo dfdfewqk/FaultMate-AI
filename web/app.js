@@ -860,4 +860,77 @@
       }
     }
   });
+}  const researchInput = document.getElementById('research-upload');
+  const researchRun = document.getElementById('research-run');
+  const researchFeedback = document.getElementById('research-feedback');
+  const researchResult = document.getElementById('research-result');
+  let researchVersion = 0;
+  let researchController = null;
+  function invalidateResearch(message) {
+    ++researchVersion;
+    if (researchController) { researchController.abort(); researchController = null; }
+    researchResult.replaceChildren();
+    researchFeedback.textContent = message;
+    researchInput.disabled = triageHazard.value === 'yes';
+    researchRun.disabled = triageHazard.value === 'yes' || !researchInput.files || !researchInput.files.length;
+  }
+  researchInput.addEventListener('change', () => invalidateResearch(
+    '실험용 특징 보고서가 변경되었습니다. 원본 검증과 정식 고장 판단은 별개입니다.'));
+  triageHazard.addEventListener('change', () => invalidateResearch(
+    triageHazard.value === 'yes'
+      ? '긴급 위험: 연구용 ML 점수 계산을 중단했습니다.'
+      : '80회 원본에서 추출한 특징 JSON만 연구용으로 점수를 계산합니다.'));
+  researchRun.addEventListener('click', async () => {
+    if (triageHazard.value === 'yes' || researchRun.disabled) return;
+    const file = researchInput.files && researchInput.files[0];
+    if (!file || file.size <= 0 || file.size > 512000 || !file.name.toLowerCase().endsWith('.json')) {
+      invalidateResearch('512KB 이하의 원본 특징 .json 파일을 선택하세요.'); return;
+    }
+    const version = ++researchVersion;
+    const controller = new AbortController();
+    researchController = controller;
+    researchResult.replaceChildren();
+    researchRun.disabled = true;
+    researchFeedback.textContent = '로컬 Paderborn 연구모델 계산 중...';
+    try {
+      const res = await fetch('/api/ml/experimental-unitless-report', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:file,cache:'no-store', signal:controller.signal,
+      });
+      if (!res.ok) throw new Error('research_report_http_invalid');
+      const result = await res.json();
+      if (version !== researchVersion || controller.signal.aborted || triageHazard.value === 'yes') return;
+      researchFeedback.textContent = result.message || '실험용 분석을 완료하지 못했습니다.';
+      if (result.status === 'experimental_unapproved' &&
+          result.research_inference_performed === true &&
+          result.model_approved_for_runtime === false &&
+          result.confirmed_fault === false && result.safe_to_work === false &&
+          (result.experimental_predicted_label === 'healthy' ||
+           result.experimental_predicted_label === 'damaged') &&
+          typeof result.experimental_damage_model_score === 'number') {
+        add(researchResult,'h4','Paderborn 연구 모델 · 미승인 실험 결과');
+        add(researchResult,'p',
+          result.bearing_id + ' / 모델 분류: ' +
+          (result.experimental_predicted_label === 'healthy' ? '정상 쪽' : '손상 쪽') +
+          ' / 손상 판별 점수 ' + result.experimental_damage_model_score.toFixed(4),
+          'result-note');
+        add(researchResult,'p',
+          '측정 수 ' + result.input_recordings + '회 · 중복 제외 후 ' +
+          result.unique_signal_pairs_reported + '개 · 업로드한 JSON으로 원본 측정파일의 진위를 검증할 수 없습니다.',
+          'small-note');
+        add(researchResult,'p',
+          '실험용 ML 점수는 현장 고장 확률·원인 확정·정비 허가가 아닙니다. 독립 정상 베어링 검증 미완료.',
+          'result-hold');
+      }
+    } catch (_e) {
+      if (version === researchVersion && !controller.signal.aborted) {
+        researchFeedback.textContent = '로컬 연구 ML 처리 실패 · 기존 진단 결과는 유지됩니다.';
+      }
+    } finally {
+      if (version === researchVersion) {
+        researchController = null;
+        researchRun.disabled = triageHazard.value === 'yes' || !researchInput.files || !researchInput.files.length;
+      }
+    }
+  });
 })();
