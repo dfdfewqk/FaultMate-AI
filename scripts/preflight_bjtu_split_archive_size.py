@@ -38,9 +38,45 @@ THIRD_PARTY_ESTIMATED_TOTAL_BYTES = 30_400_000_000
 RESOURCE_BUDGET_BYTES = 6_000_000_000
 
 
-class _NoRedirects(HTTPRedirectHandler):
+def _is_verified_google_download_host(url: str) -> bool:
+    """Explicit allowlist: signed link may redirect only within Google-owned HTTPS."""
+    try:
+        u = urlsplit(url)
+        host = (u.hostname or "").lower()
+        return (
+            u.scheme == "https"
+            and u.username is None and u.password is None
+            and u.port in (None, 443)
+            and host in {
+                "drive.google.com", "drive.usercontent.google.com",
+                "docs.google.com",
+            } or (
+                u.scheme == "https"
+                and u.username is None and u.password is None
+                and u.port in (None, 443)
+                and host.endswith(".googleusercontent.com")
+            )
+        )
+    except ValueError:
+        return False
+
+
+class _GoogleOnlyRedirects(HTTPRedirectHandler):
+    """Maximum two Google HTTPS redirects; preserve HEAD/one-byte Range."""
+
+    def __init__(self):
+        super().__init__()
+        self.hops = 0
+
     def redirect_request(self, request, fp, code, msg, headers, newurl):
-        return None
+        if code not in (301, 302, 303, 307, 308):
+            return None
+        if self.hops >= 2 or not _is_verified_google_download_host(newurl):
+            return None
+        self.hops += 1
+        # Never convert HEAD into a GET; never drop the Range header.
+        return Request(newurl, headers=dict(request.header_items()),
+                       method=request.get_method())
 
 
 def _read_file_index(*, timeout_seconds: int = 50) -> dict[str, str]:
@@ -93,7 +129,7 @@ def _single_part_head_or_one_byte_range(url: str, *, timeout_seconds: int = 12) 
     """Never read response.body, even for 200, 302 or 206. No cookies."""
     if not _safe_public_drive_url(url):
         raise PublishedSourceError("untrusted_public_source_url")
-    opener = build_opener(_NoRedirects)
+    opener = build_opener(_GoogleOnlyRedirects())
     results = []
     reported_size = None
     for method in ("HEAD", "GET"):
