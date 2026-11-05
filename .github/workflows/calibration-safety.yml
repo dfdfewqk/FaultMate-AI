@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - work/faultmate-sensor-calibration-20261105
+      - work/faultmate-sensor-calibration-reconciled-20261105
     paths:
       - .github/workflows/calibration-safety.yml
       - scripts/convert_mat_to_csv.py
