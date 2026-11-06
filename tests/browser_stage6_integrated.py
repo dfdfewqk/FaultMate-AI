@@ -78,6 +78,15 @@ async def run():
                 await page.locator("#triage-submit").click()
                 await page.locator("#triage-result .result-cause").first.wait_for()
                 assert await page.locator("#agent-run").is_disabled()
+                # Actual UI entry: explain WHY the button is locked instead
+                # of requiring the operator to discover hidden steps.
+                assert "기존 교육용 사례 7개" in await page.locator(".subhead").inner_text()
+                await page.locator("#ai-quick-start").click()
+                assert await page.locator("#integration-panel").evaluate("(el) => el.open")
+                assert "전송 예정 자료 확인" in await page.locator("#agent-next-step").inner_text()
+                assert await page.locator("#agent-run").is_disabled()
+                # Keep the existing old menu workflow working too.
+                await page.locator("#integration-panel > summary").click()
                 await page.locator("#integration-panel > summary").click()
 
                 await page.locator("#agent-preview").click()
@@ -86,7 +95,8 @@ async def run():
                 assert "CONV-001" in preview and "STAGE6_PRIVATE" not in preview
                 await page.locator("#agent-consent").check()
                 assert await page.locator("#agent-run").is_enabled()
-
+                assert "비용" in await page.locator("#agent-next-step").inner_text()
+                
                 # Any input change invalidates the user's consent and the hash.
                 await page.locator("#triage-symptom").fill("STAGE6_PRIVATE_NEW_SYMPTOM")
                 assert await page.locator("#agent-run").is_disabled()
