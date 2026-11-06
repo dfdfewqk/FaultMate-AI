@@ -126,3 +126,14 @@ h1{font-size:clamp(27px,3vw,35px);margin:20px 0 10px}
 /* Safe, specific error guidance after a consented DeepSeek attempt. */
 .agent-failure-reason{border:1px solid #ecc8a9;background:#fff5e9;color:#784b25;border-radius:9px;padding:12px 14px;font-size:13px;font-weight:650;line-height:1.65}
 #agent-feedback[role=status]{overflow-wrap:anywhere}
+
+
+/* AI review is a citable ordering of the SAME original case candidates,
+   not a diagnosis or a reduction of the safety review scope. */
+.agent-result-summary{font-weight:700;color:#294763;background:#edf4fc;border:1px solid #d0e0f2;padding:12px 14px;border-radius:9px;line-height:1.65}
+.agent-cause{background:#f6f9fd;border:1px solid #dee7f3;border-radius:10px;padding:12px 14px;margin:11px 0}
+.agent-cause-priority{background:#f0f6ff;border-left:4px solid #4784c9}
+.agent-cause b{display:block;color:#243c56;font-size:13px}
+.agent-cause p{margin:8px 0 4px}
+.agent-cause a{display:block;font-size:12px;overflow-wrap:anywhere}
+#agent-result h4{margin-top:21px}
