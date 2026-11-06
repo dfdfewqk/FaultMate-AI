@@ -7,6 +7,7 @@ on:
       - work/faultmate-stage7-ki21-feature-attribution-20261106
       - work/faultmate-stage7-ki21-condition-slices-20261106
       - work/faultmate-stage7-ki21-current-scaler-20261106
+      - work/faultmate-stage7-current-dev-reference-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
@@ -14,6 +15,7 @@ on:
       - work/faultmate-stage7-dev-miss-warning-20261106
       - work/faultmate-stage7-ki21-feature-attribution-20261106
       - work/faultmate-stage7-ki21-condition-slices-20261106
+      - work/faultmate-stage7-ki21-current-scaler-20261106
 
 permissions:
   contents: read
@@ -309,6 +311,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
+      actions: read
     env:
       DEEPSEEK_API_KEY: ""
     steps:
@@ -371,12 +374,41 @@ jobs:
           }
           Write-Output "ATTRIBUTION_IS_FROZEN_MODEL_ARITHMETIC_NOT_PHYSICAL_CAUSE_NOT_NEW_EVALUATION"
           Write-Output "REAL_KI21_ORIGINAL_80MAT_FROZEN_12_FEATURE_LOGIT_ATTRIBUTION_PASS_NO_NEW_TEST"
+      - name: Download PINNED ten original development bearing feature/audit evidence only
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $features = Join-Path $env:RUNNER_TEMP "faultmate_dev_features"
+          $audits = Join-Path $env:RUNNER_TEMP "faultmate_dev_audits"
+          $baseline = Join-Path $env:RUNNER_TEMP "faultmate_dev_baseline"
+          New-Item -Force -ItemType Directory $features, $audits, $baseline | Out-Null
+          & gh run download 41965647928 --repo $env:GITHUB_REPOSITORY --name "stage4-real-12-bearing-unitless-evaluation-unapproved" --dir $baseline
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($bearing in @("K001","K002","K003","K004","K005","KA04","KA16","KB23","KI04","KI16")) {
+            & gh run download 41965647928 --repo $env:GITHUB_REPOSITORY --name "stage4-unitless-bearing-$bearing" --dir $features
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & gh run download 41957475830 --repo $env:GITHUB_REPOSITORY --name "stage3-bearing-$bearing" --dir $audits
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if ((@(Get-ChildItem $features -File -Filter "*.json")).Count -ne 10 -or
+              (@(Get-ChildItem $audits -File -Filter "*.json")).Count -ne 10 -or
+              -not (Test-Path (Join-Path $baseline "real_unitless_evaluation.json")) -or
+              (Test-Path (Join-Path $features "K006.json")) -or
+              (Test-Path (Join-Path $features "KI18.json")) -or
+              (Test-Path (Join-Path $features "KI21.json"))) {
+            throw "Missing/forbidden original development evidence artifact"
+          }
+          Write-Output "EXACT_TEN_PINNED_DEVELOPMENT_FEATURE_ARTIFACTS_FETCHED_AWAITING_SHA_REVERIFICATION"
       - name: Original KI21 four-condition pooled-median sensitivity (research only)
         shell: pwsh
         run: |
           $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
           $report = Join-Path $env:RUNNER_TEMP "ki21_four_condition_diagnostic.json"
-          python -m scripts.audit_known_ki21_conditions --archive $archive > $report
+          $features = Join-Path $env:RUNNER_TEMP "faultmate_dev_features"
+          $audits = Join-Path $env:RUNNER_TEMP "faultmate_dev_audits"
+          $baseline = Join-Path $env:RUNNER_TEMP "faultmate_dev_baseline"
+          python -m scripts.audit_known_ki21_conditions --archive $archive --dev-features $features --dev-audits $audits --dev-baseline (Join-Path $baseline "real_unitless_evaluation.json") > $report
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $r = Get-Content $report -Raw | ConvertFrom-Json
           $rows = @($r.four_operating_conditions)
@@ -442,6 +474,38 @@ jobs:
               Write-Output ("KI21_CURRENT_SCALER_DIAGNOSTIC condition={0} feature={1} median_z_vs_bearing_scaler={2:N4} iqr_in_scaler_units={3:N4} delta_logit_vs_pooled={4:N4} UNCALIBRATED" -f $group.condition, $f.feature, [double]$f.condition_median_z_vs_training_bearing_scaler, [double]$f.condition_iqr_in_training_scaler_units, [double]$f.logit_contribution_shift_vs_pooled)
             }
           }
+          $dev = $r.development_only_current_reference
+          $refs = @($dev.four_conditions)
+          if ($dev.source_dev_original_sha_verification_is_precondition -ne $true -or
+              $dev.replay_ki21_original_rar_in_same_run_is_precondition -ne $true -or
+              $dev.dev_physical_bearing_count -ne 10 -or
+              $dev.dev_original_unique_feature_records -ne 796 -or
+              $dev.ki21_original_mat_recordings -ne 80 -or
+              $dev.ki21_not_used_for_model_training_or_feature_selection -ne $true -or
+              $dev.new_independent_healthy_cohort_measured -ne $false -or
+              $dev.accuracy_or_specificity_estimated -ne $false -or
+              $dev.model_refitted_or_threshold_changed -ne $false -or
+              $dev.production_ml_activation_allowed -ne $false -or
+              $refs.Count -ne 4) {
+            throw "DEV comparison leakage or fabricated validation"
+          }
+          foreach ($c in $refs) {
+            $features = @($c.features)
+            if ($c.healthy_dev -ne 5 -or $c.damaged_dev -ne 5 -or
+                $c.development_physical_bearings -ne 10 -or
+                $features.Count -ne 6) {
+              throw "DEV comparison physical bearings/condition references invalid"
+            }
+            foreach ($f in $features) {
+              if ($f.development_healthy_physical_bearings -ne 5 -or
+                  $f.development_damaged_physical_bearings -ne 5 -or
+                  $f.not_an_independent_accuracy_or_calibrated_outlier_test -ne $true) {
+                throw "False independent reference/specificity claim"
+              }
+              Write-Output ("KI21_VS_10_DEV_CONDITION condition={0} feature={1} ki21={2:N7} healthy_dev_median={3:N7} damaged_dev_median={4:N7} dev_min={5:N7} dev_max={6:N7} below_dev_range={7} above_dev_range={8} REUSED_DEV_DESCRIPTIVE_ONLY" -f $c.condition, $f.feature, [double]$f.ki21_condition_median_unitless, [double]$f.healthy_dev_condition_medians_median, [double]$f.damaged_dev_condition_medians_median, [double]$f.all_dev_condition_medians_min, [double]$f.all_dev_condition_medians_max, $f.ki21_below_all_dev_observed_range, $f.ki21_above_all_dev_observed_range)
+            }
+          }
+          Write-Output "KI21_VS_10_SHA_VERIFIED_DEV_BEARINGS_NOT_NEW_ACCURACY_NOT_MODEL_TUNING_PASS"
           Write-Output "KI21_CURRENT_TRAINING_SCALER_DESCRIPTIVE_ONLY_NOT_ANOMALY_OR_RUNTIME_APPROVAL"
           Write-Output "KI21_CONDITIONS_80_MAT_RECHECK_PASS_NOT_NEW_EVAL_NOT_VALIDATED_CONDITION_MODEL"
       - name: Original record safe and source/license untouched
