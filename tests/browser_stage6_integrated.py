@@ -166,6 +166,37 @@ async def run():
                 assert not await page.locator("#agent-consent").is_checked()
                 assert len(invocations) == 1
                 assert requests.count(("POST", "/api/agent/review")) == 2
+
+                # Provider auth, balance and throttling are DIFFERENT actionable
+                # conditions. Both the request and its failure are mocked.
+                # No provider body, secret, unsupported command or new paid
+                # request may ever be exposed or automatically retried.
+                for error_code, visible in (
+                    ("provider_authentication_failed", "인증 거부(401)"),
+                    ("provider_insufficient_balance", "잔액 부족(402)"),
+                    ("provider_rate_limited", "요청 제한(429)"),
+                    ("provider_timeout", "시간 초과"),
+                    ("provider_transport_or_response_invalid", "응답 형식 검증"),
+                ):
+                    def fail_with_allowlisted_code(_context, _key, code=error_code):
+                        raise agent._ProviderError(code)
+                    agent._invoke_deepseek = fail_with_allowlisted_code
+                    before_count = requests.count(("POST", "/api/agent/review"))
+                    await page.locator("#agent-preview").click()
+                    await page.locator("#agent-preview-content:not([hidden])").wait_for()
+                    await page.locator("#agent-consent").check()
+                    await page.locator("#agent-run").click()
+                    await page.wait_for_function(
+                        "(text) => document.querySelector('#agent-result').textContent.includes(text)",
+                        visible)
+                    result_text = await page.locator("#agent-result").inner_text()
+                    assert "자동 재요청하지 않습니다" in result_text
+                    assert "PRIVATE_MOCK_PROVIDER_DIAGNOSTIC" not in result_text
+                    assert "SYNTHETIC_STAGE6_NO_NETWORK_KEY" not in result_text
+                    assert "전송 여부 확인 불가" in await page.locator("#agent-feedback").inner_text()
+                    assert requests.count(("POST", "/api/agent/review")) == before_count + 1
+                    assert await page.locator("#agent-run").is_disabled()
+
                 agent._invoke_deepseek = fake_invoke
 
                 await page.locator("#ml-upload").set_input_files({
