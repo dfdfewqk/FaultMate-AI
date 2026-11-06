@@ -54,8 +54,20 @@ def _summary(entry: dict):
 
 
 def discover():
-    pub = retrieve(f"/datasets/{DATASET}", {"version": VERSION})
-    folders = retrieve(f"/datasets/publics/{DATASET}/folders", {"version": VERSION})
+    # The generic /datasets/{id} endpoint can require OIDC (401) despite
+    # public website visibility. Probe the documented public file endpoint
+    # FIRST: unauthenticated metadata discovery may still be permitted.
+    pub = None
+    optional_lookup_errors = []
+    try:
+        pub = retrieve(f"/datasets/publics/{DATASET}", {"version": VERSION})
+    except ValueError as exc:
+        optional_lookup_errors.append("public_metadata: " + str(exc))
+    try:
+        folders = retrieve(f"/datasets/publics/{DATASET}/folders", {"version": VERSION})
+    except ValueError as exc:
+        optional_lookup_errors.append("public_folders: " + str(exc))
+        folders = []
     if isinstance(folders, dict):
         folders = folders.get("results") or folders.get("folders") or []
     if not isinstance(folders, list):
@@ -100,7 +112,8 @@ def discover():
     return {
         "dataset_id": DATASET, "published_version": 3,
         "api_source": ORIGIN,
-        "public_metadata_available": True,
+        "public_metadata_available": pub is not None,
+        "optional_lookup_errors": optional_lookup_errors,
         "dataset_metadata_fields": sorted(pub.keys()) if isinstance(pub, dict) else [],
         "published_title": pub.get("name") if isinstance(pub, dict) else None,
         "folder_count": len(folders),
