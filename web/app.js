@@ -214,6 +214,7 @@
   let suggestionController = null;
   let suggestionTimer = null;
   let demoMode = false;
+  let agentKeyConfigured = null; // status only; never a credential in client JS
   let agentConsent = null;
   let agentRun = null;
   let agentPreviewContent = null;
@@ -680,18 +681,22 @@
     const caps = await request('/api/integration/capabilities');
     const agentReady = caps.agent?.connected === true;
     const agentConfigured = caps.agent?.configured === true;
+    agentKeyConfigured = agentConfigured;
     const mlReady = caps.ml?.connected === true && caps.ml?.trained === true && caps.ml?.inference_enabled === true;
     integrationAgent.textContent = agentReady ? '연결 확인됨' : (agentConfigured ? '키 설정됨 · 실제 연결 미확인' : 'API 키 없음');
     integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
     integrationTransfer.textContent = agentConfigured ? '요청별 명시 동의 후 가능' : 'API 키 미설정 · 전송 없음';
     integrationDetail.textContent = '로컬 연결 계약 ' + String(caps.contract_version || '미확인') + ' · 외부 AI는 매 요청 동의 필요. 실제 호출·모델 검증 상태를 과장하지 않습니다.';
     document.getElementById('agent-status').textContent = agentReady ? '연결됨' : (agentConfigured ? '설정됨' : '미연결');
+    syncAgentButton();
     } catch (_e) {
     integrationAgent.textContent = '상태 확인 실패';
     integrationMl.textContent = '상태 확인 실패';
     integrationTransfer.textContent = '확인 불가';
     document.getElementById('agent-status').textContent = '상태 확인 실패';
     integrationDetail.textContent = '연동 상태 API 응답이 없습니다. AI·ML은 검증되지 않았으며 로컬 규칙 기반 검토만 이용하세요.';
+    agentKeyConfigured = null;
+    syncAgentButton();
   }
   })();
   // Optional AI evidence review: each request requires explicit consent and preview.
@@ -702,11 +707,44 @@
   agentRun = document.getElementById('agent-run');
   const agentFeedback = document.getElementById('agent-feedback');
   agentResult = document.getElementById('agent-result');
+  const agentNextStep = document.getElementById('agent-next-step');
+  // This shortcut NEVER calls DeepSeek; it only reveals the existing controls
+  // and the exact reason the paid button cannot yet be used.
+  document.getElementById('ai-quick-start').addEventListener('click', () => {
+    const panel = document.getElementById('integration-panel');
+    panel.open = true;
+    syncAgentButton();
+    document.getElementById('agent-controls').scrollIntoView({behavior:'smooth', block:'start'});
+  });
   function syncAgentButton() {
     if (!agentRun || !agentConsent) return;
     agentPreviewButton.disabled = triageHazard.value === 'yes';
+    const previewValid = !!agentReviewedContextHash && lastPreviewVersion === agentPreviewVersion;
     agentRun.disabled = !triageCase.value || !triageOptions || demoMode || triageHazard.value === 'yes' ||
-      !agentConsent.checked || !agentReviewedContextHash || lastPreviewVersion !== agentPreviewVersion || !!agentRequestController;
+      !agentConsent.checked || !previewValid || !!agentRequestController;
+    if (agentNextStep) {
+      let help;
+      if (triageHazard.value === 'yes') {
+        help = '긴급 위험이 선택되어 AI 요청이 차단됐습니다. 현장 비상 절차를 우선하세요.';
+      } else if (!triageOptions || !triageCase.value) {
+        help = '① 먼저 위 진단 화면에서 설비 종류와 검토할 사례를 직접 선택하세요.';
+      } else if (demoMode) {
+        help = '예시 입력은 실제 설비 자료가 아니어서 외부 AI 요청이 차단됩니다. 테스트 결과는 로컬 진단으로 확인하세요.';
+      } else if (agentRequestController) {
+        help = 'AI 요청 처리 중입니다. 응답이 없더라도 서버에 자료가 전달되었을 수 있습니다.';
+      } else if (!previewValid) {
+        help = '② 아래 ‘AI 전송 예정 자료 확인’ 버튼을 누르면 외부로 보낼 정보가 표시됩니다. 아직 전송되지는 않습니다.';
+      } else if (!agentConsent.checked) {
+        help = '③ 미리보기 내용을 확인했다면 바로 아래 동의 체크박스를 선택하세요. 체크만으로는 전송되지 않습니다.';
+      } else if (agentKeyConfigured === false) {
+        help = '④ 버튼이 활성화됐지만 서버에 DeepSeek API 키가 없어 실제 호출할 수 없습니다. 아래 키 설정 안내를 확인하세요.';
+      } else if (agentKeyConfigured === null) {
+        help = '④ 버튼이 활성화됐지만 서버 연결 상태를 확인하지 못했습니다. 요청하면 전송될 수 있으니 키와 동의 여부를 확인하세요.';
+      } else {
+        help = '④ ‘AI 근거 검토 실행’을 누르면 외부 DeepSeek로 선택된 근거가 전송되며 API 비용이 발생할 수 있습니다.';
+      }
+      agentNextStep.textContent = help;
+    }
   }
   function invalidateAgentReview() {
     if (!agentConsent || !agentRun) return;
@@ -807,6 +845,7 @@
       }
     }
   });
+  syncAgentButton();
   const mlInput = document.getElementById('ml-upload');
   const mlRun = document.getElementById('ml-run');
   const mlFeedback = document.getElementById('ml-feedback');
