@@ -950,31 +950,42 @@
   const mlResult = document.getElementById('ml-result');
   let mlRequestVersion = 0;
   let activeMlController = null;
+  // CSV has NO approved inference model. A file must be present before the
+  // operator can check its format, even after hazard toggles and resets.
+  function syncMlControls() {
+    const hazard = triageHazard.value === 'yes';
+    mlInput.disabled = hazard;
+    mlRun.disabled = hazard || !!activeMlController ||
+      !(mlInput.files && mlInput.files.length);
+  }
   function invalidateMl(message) {
     ++mlRequestVersion;
+    const pending = !!activeMlController;
     if (activeMlController) { activeMlController.abort(); activeMlController = null; }
     mlResult.replaceChildren();
-    mlFeedback.textContent = message;
-    mlRun.disabled = triageHazard.value === 'yes';
-    mlInput.disabled = triageHazard.value === 'yes';
+    mlFeedback.textContent = pending
+      ? message + ' 이미 전달된 로컬 검사는 서버에서 이어질 수 있지만 이전 결과를 다시 표시하지 않습니다.'
+      : message;
+    syncMlControls();
   }
   mlInput.addEventListener('change', () => invalidateMl('파일이 변경되었습니다. 새 파일을 검토하세요.'));
   triageHazard.addEventListener('change', () => {
     invalidateMl(triageHazard.value === 'yes' ? '긴급 위험: 분석을 중단했습니다.' : '필요한 경우 CSV를 선택해 분석하세요.');
   });
-  mlRun.disabled = triageHazard.value === 'yes';
-  mlInput.disabled = triageHazard.value === 'yes';
+  syncMlControls();
   mlRun.addEventListener('click', async () => {
     if (triageHazard.value === 'yes') { invalidateMl('긴급 위험: 분석을 중단했습니다.'); return; }
+    if (activeMlController) return;
     const file = mlInput.files && mlInput.files[0];
-    if (!file || file.size > 256000) {
-      invalidateMl('256KB 이하의 특성 CSV 파일을 선택하세요.'); return;
+    if (!file || !file.name.toLowerCase().endsWith('.csv') ||
+        file.size <= 0 || file.size > 256000) {
+      invalidateMl('비어 있지 않은 256KB 이하의 특성 .csv 파일을 선택하세요.'); return;
     }
     const version = ++mlRequestVersion;
     const controller = new AbortController();
     activeMlController = controller;
     mlResult.replaceChildren();
-    mlRun.disabled = true;
+    syncMlControls();
     mlFeedback.textContent = '로컬 CSV 검토 중...';
     try {
       const response = await fetch('/api/ml/inspect',{method:'POST',headers:{'Content-Type':'text/csv'},
@@ -993,7 +1004,7 @@
     } finally {
       if (version === mlRequestVersion) {
         activeMlController = null;
-        mlRun.disabled = triageHazard.value === 'yes';
+        syncMlControls();
       }
     }
   });
@@ -1005,9 +1016,12 @@
   let researchController = null;
   function invalidateResearch(message) {
     ++researchVersion;
+    const pending = !!researchController;
     if (researchController) { researchController.abort(); researchController = null; }
     researchResult.replaceChildren();
-    researchFeedback.textContent = message;
+    researchFeedback.textContent = pending
+      ? message + ' 이미 전달된 로컬 서버 검사는 계속될 수 있지만 이전 결과를 다시 표시하지 않습니다.'
+      : message;
     researchInput.disabled = triageHazard.value === 'yes';
     researchRun.disabled = triageHazard.value === 'yes' || !researchInput.files || !researchInput.files.length;
   }
@@ -1082,12 +1096,15 @@
   let rawRarController = null;
   function invalidateRawRar(message) {
     ++rawRarVersion;
+    const pending = !!rawRarController;
     if (rawRarController) {
       rawRarController.abort();
       rawRarController = null;
     }
     rawRarResult.replaceChildren();
-    rawRarFeedback.textContent = message;
+    rawRarFeedback.textContent = pending
+      ? message + ' 전송된 원본 검사는 서버에서 계속될 수 있습니다. 이전 결과는 폐기했습니다.'
+      : message;
     rawRarInput.disabled = triageHazard.value === 'yes';
     rawRarRun.disabled = triageHazard.value === 'yes' ||
       !(rawRarInput.files && rawRarInput.files.length);
@@ -1126,7 +1143,8 @@
         },
         body:file, cache:'no-store',signal:controller.signal,
       });
-      const result = await res.json();
+      // A Windows proxy / local HTTP failure may return HTML rather than
+      // JSON on 409/413/507. Preserve actionable status even in that case.
       if (version !== rawRarVersion || controller.signal.aborted ||
           triageHazard.value === 'yes') return;
       if (!res.ok) {
@@ -1137,6 +1155,9 @@
           '원본 RAR 형식·종류 또는 요청을 확인할 수 없습니다. 예측하지 않았습니다.';
         return;
       }
+      const result = await res.json();
+      if (version !== rawRarVersion || controller.signal.aborted ||
+          triageHazard.value === 'yes') return;
       rawRarFeedback.textContent = result.message ||
         '원본 데이터의 검증에 실패하여 예측하지 않았습니다.';
       if (result.status === 'experimental_unapproved' &&
