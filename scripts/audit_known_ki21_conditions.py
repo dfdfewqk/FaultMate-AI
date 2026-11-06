@@ -28,6 +28,7 @@ from scripts.evaluate_unseen_paderborn_damaged import frozen_coefficients
 from scripts.extract_paderborn_unitless import FEATURE_NAMES
 from scripts.extract_unseen_paderborn_damaged import extract_unseen
 from scripts.explain_known_ki21_frozen_model import explain_frozen_logit
+from scripts.audit_known_ki21_current_scaler import describe_current_scaler_dispersion
 from scripts.replay_prior_damaged_bearing import (
     KNOWN_HISTORICAL_MISS, score_prior_damaged_report,
     validate_prior_damaged_report,
@@ -144,6 +145,16 @@ def analyze_original_ki21_conditions(archive: Path, *, sevenzip: str) -> dict:
     reference = score_prior_damaged_report(doc)
     frozen = frozen_coefficients()
     result = compare_verified_condition_records(doc, frozen, pooled_vector)
+    current_review = describe_current_scaler_dispersion(doc, frozen, pooled_vector)
+    for condition, slice_ in zip(
+        current_review["condition_rows"], result["four_operating_conditions"]
+    ):
+        if (condition["condition"] != slice_["condition"]
+            or condition["unique_signal_pairs"] != slice_["unique_signal_pairs"]
+            or abs(condition["sum_current_logit_shift_vs_pooled"] -
+                   (slice_["current_logit_contribution"] -
+                    result["pooled_current_logit_contribution"])) > 1e-9):
+            raise ValueError("ki21_current_scaler_replay_inconsistent_with_frozen_logit")
     if (reference["experimental_predicted_label"] != result["frozen_pooled_label"]
         or abs(reference["experimental_damage_model_score"] -
                result["frozen_pooled_score"]) > 0.000000011
@@ -158,6 +169,7 @@ def analyze_original_ki21_conditions(archive: Path, *, sevenzip: str) -> dict:
         "source_mat_recordings": info["source_mat_recordings"],
         "frozen_model_sha256": reference["frozen_model_sha256"],
         **result,
+        "current_scaler_diagnostic": current_review,
         "previously_opened_ki21_not_new_independent_test": True,
         "model_refitted_or_threshold_modified": False,
         "production_model_approved": False,
