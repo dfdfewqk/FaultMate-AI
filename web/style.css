@@ -121,3 +121,8 @@ h1{font-size:clamp(27px,3vw,35px);margin:20px 0 10px}
 .agent-key-check button{font:inherit;font-size:12px;font-weight:700;color:#204e87;border:1px solid #b5c9e6;border-radius:9px;padding:11px 13px;background:#fff;cursor:pointer}
 .agent-key-check button:disabled{opacity:.65;cursor:progress}
 .agent-key-check button:focus-visible{outline:2px solid #3471cc;outline-offset:2px}
+
+
+/* Safe, specific error guidance after a consented DeepSeek attempt. */
+.agent-failure-reason{border:1px solid #ecc8a9;background:#fff5e9;color:#784b25;border-radius:9px;padding:12px 14px;font-size:13px;font-weight:650;line-height:1.65}
+#agent-feedback[role=status]{overflow-wrap:anywhere}
