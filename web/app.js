@@ -879,7 +879,7 @@
         add(agentResult,'p','AI는 기존 등록 자료에서 확인 순서만 골랐습니다. 새로운 고장 원인·확률·정비 명령은 생성하지 않았습니다.','small-note');
 
         // Only locally curated references can be displayed. Never insert
-        // untrusted model free text or external links through innerHTML.
+        // untrusted model free text or external links through dynamic markup.
         function renderCauseWithEvidence(c, firstPriority, number) {
           const entry = document.createElement('section');
           entry.className = firstPriority ? 'agent-cause agent-cause-priority' : 'agent-cause';
