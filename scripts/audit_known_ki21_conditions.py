@@ -183,6 +183,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--sevenzip", default=None)
+    parser.add_argument("--dev-features", type=Path)
+    parser.add_argument("--dev-audits", type=Path)
+    parser.add_argument("--dev-baseline", type=Path)
     args = parser.parse_args()
     tool = args.sevenzip or shutil.which("7z") or shutil.which("7zz")
     if not tool and sys.platform == "win32":
@@ -190,7 +193,29 @@ def main() -> int:
         tool = str(candidate) if candidate.is_file() else None
     if not tool:
         parser.error("existing_7zip_required")
+    dev_paths = (args.dev_features, args.dev_audits, args.dev_baseline)
+    if any(x is not None for x in dev_paths) and not all(
+        x is not None for x in dev_paths
+    ):
+        parser.error("all_three_pinned_development_source_paths_required")
     doc = analyze_original_ki21_conditions(args.archive, sevenzip=tool)
+    if all(x is not None for x in dev_paths):
+        # These source assets were already in the training/development set.
+        # Existing verifier pins their original SHA, MD5, labels, duplicate
+        # ledger, 796 unique records and excludes prior heldout K006/KI18.
+        from scripts.evaluate_unitless_dev_only import verified_dev_rows
+        from scripts.compare_ki21_dev_conditions import (
+            compare_ki21_to_verified_development,
+        )
+        dev_rows, source_provenance = verified_dev_rows(
+            args.dev_features, args.dev_audits, args.dev_baseline,
+        )
+        doc["development_only_current_reference"] = (
+            compare_ki21_to_verified_development(
+                doc["current_scaler_diagnostic"],
+                dev_rows, source_provenance, frozen_coefficients(),
+            )
+        )
     print(json.dumps(doc, ensure_ascii=False, indent=2, allow_nan=False))
     return 0
 
