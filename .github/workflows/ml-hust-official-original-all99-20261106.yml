@@ -32,7 +32,7 @@ jobs:
           python -m compileall -q scripts/audit_hust_v3_all_official_mat_originals.py
 
   actual-original-mat-sha:
-    name: Verify official source original MAT SHA for shard ${dollar}{{ matrix.shard }}
+    name: Verify official source original MAT SHA for shard ${{ matrix.shard }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     needs: source-audit-guards
@@ -52,12 +52,12 @@ jobs:
         run: python -m pip install -r requirements-ml.txt
       - name: Download official published originals of this shard into ephemeral memory, require actual publisher SHA256
         run: |
-          python scripts/audit_hust_v3_all_official_mat_originals.py --shard ${dollar}{{ matrix.shard }} --shards 5 --out "${dollar}RUNNER_TEMP/shard-${dollar}{{ matrix.shard }}.json"
+          python scripts/audit_hust_v3_all_official_mat_originals.py --shard ${{ matrix.shard }} --shards 5 --out "$RUNNER_TEMP/shard-${{ matrix.shard }}.json"
       - name: Publish only 20 or fewer source SHA metadata records, no MAT signal or ML weights
         uses: actions/upload-artifact@v4
         with:
-          name: hust-original-shard-${dollar}{{ matrix.shard }}
-          path: ${dollar}{{ runner.temp }}/shard-${dollar}{{ matrix.shard }}.json
+          name: hust-original-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/shard-${{ matrix.shard }}.json
           retention-days: 7
           if-no-files-found: error
 
@@ -81,7 +81,7 @@ jobs:
           merge-multiple: true
       - name: Aggregate real source audit; block missing/reused original bytes and bogus physical test count
         run: |
-          python scripts/audit_hust_v3_all_official_mat_originals.py --merge-dir original-sha-shards --out "${dollar}RUNNER_TEMP/hust_real_99_official_sha_report.json"
+          python scripts/audit_hust_v3_all_official_mat_originals.py --merge-dir original-sha-shards --out "$RUNNER_TEMP/hust_real_99_official_sha_report.json"
           python - <<'PY'
           import json, os
           from pathlib import Path
@@ -99,6 +99,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hust-v3-real-99-original-source-sha-only-review
-          path: ${dollar}{{ runner.temp }}/hust_real_99_official_sha_report.json
+          path: ${{ runner.temp }}/hust_real_99_official_sha_report.json
           retention-days: 7
           if-no-files-found: error
