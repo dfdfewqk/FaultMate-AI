@@ -34,10 +34,21 @@ _RESEARCH_BUSY = threading.BoundedSemaphore(value=1)
 def validate_bearing_id(raw_id: str | None) -> str:
     if not isinstance(raw_id, str) or not READABLE_BEARING.fullmatch(raw_id):
         raise HTTPException(status_code=422, detail="supported_original_bearing_id_required")
-    if raw_id not in {a["id"] for a in validate_catalog(
+    approved_dev = {a["id"] for a in validate_catalog(
         json.loads(CATALOG.read_text(encoding="utf-8"))
-    )}:
-        raise HTTPException(status_code=422, detail="only_original_paderborn_12_bearings_supported")
+    )}
+    if raw_id not in approved_dev:
+        # This original source subset was already tested as damaged-only
+        # and is NOT fresh/blind independent data on any subsequent replay.
+        from scripts.extract_unseen_paderborn_damaged import (
+            KNOWN_NEW_MD5, verified_manifest,
+        )
+        if raw_id not in KNOWN_NEW_MD5:
+            raise HTTPException(
+                status_code=422,
+                detail="only_pinned_original_paderborn_dev_or_previously_tested_damaged_supported",
+            )
+        verified_manifest()
     return raw_id
 
 
@@ -77,23 +88,46 @@ def _research_score(archive: Path, asset: str) -> dict:
             "confirmed_fault": False, "safe_to_work": False,
             "message": "원본 RAR을 읽는 7-Zip 실행 도구가 없어 분석을 시작하지 못했습니다.",
         }
-    from scripts.run_experimental_paderborn_ml import run_archive
-    score = run_archive(archive, asset, sevenzip=sevenzip)
+    from scripts.extract_unseen_paderborn_damaged import KNOWN_NEW_MD5
+    is_historical_damaged = asset in KNOWN_NEW_MD5
+    if is_historical_damaged:
+        from scripts.replay_prior_damaged_bearing import run_prior_damaged_archive
+        score = run_prior_damaged_archive(archive, asset, sevenzip=sevenzip)
+        signal_count = score["source_mat_recordings"]
+        unique_count = score["source_unique_signal_pairs"]
+        duplicate_count = score["duplicates_excluded"]
+        known_truth_label = "damaged"
+        missed_damage = score["historical_false_negative"]
+    else:
+        from scripts.run_experimental_paderborn_ml import run_archive
+        score = run_archive(archive, asset, sevenzip=sevenzip)
+        signal_count = score["research_input_source"]["source_records"]
+        unique_count = score["research_input_source"]["unique_signal_pairs"]
+        duplicate_count = score["research_input_source"]["duplicates_excluded"]
+        # Source catalog labels are research labels, not equipment safety.
+        catalog = {row["id"]: row for row in validate_catalog(
+            json.loads(CATALOG.read_text(encoding="utf-8"))
+        )}
+        known_truth_label = catalog[asset]["label"]
+        missed_damage = False  # This was a development/earlier holdout asset.
     return {
         "status": "experimental_unapproved",
         "research_inference_performed": True,
         "original_rar_md5_verified_in_this_request": True,
         "source_archive_reverified_from_original_bytes_this_http_request": True,
-        "source_mat_files_actually_read_this_run": score["source_mat_files_actually_read_this_run"],
-        "four_paderborn_conditions_verified": score["research_input_source"]["four_source_conditions_present"],
+        "source_mat_files_actually_read_this_run": signal_count,
+        "four_paderborn_conditions_verified": True,
         "bearing_id": asset,
-        "source_original_recordings": score["research_input_source"]["source_records"],
-        "source_unique_signal_pairs": score["research_input_source"]["unique_signal_pairs"],
-        "duplicates_excluded": score["research_input_source"]["duplicates_excluded"],
+        "source_original_recordings": signal_count,
+        "source_unique_signal_pairs": unique_count,
+        "duplicates_excluded": duplicate_count,
         "frozen_model_sha256": score["frozen_model_sha256"],
         "experimental_predicted_label": score["experimental_predicted_label"],
         "experimental_damage_model_score": score["experimental_damage_model_score"],
-        "old_training_bearing_may_have_been_used": True,
+        "source_known_research_truth_label": known_truth_label,
+        "previously_opened_damaged_test_replay_not_new_evaluation": is_historical_damaged,
+        "historical_known_damaged_false_negative": missed_damage,
+        "old_training_bearing_may_have_been_used": not is_historical_damaged,
         "new_independent_healthy_specificity_measured": False,
         "overall_field_accuracy_measured": False,
         "physical_si_units_verified": False,
@@ -105,12 +139,14 @@ def _research_score(archive: Path, asset: str) -> dict:
         "maintenance_action_authorized": False,
         "external_ai_transfer": False,
         "message": (
-            "원본 Paderborn RAR 및 80개 센서 측정파일을 실제 검증해 기존 연구 모델로 "
-            "계산했습니다. 학습에 이미 사용한 베어링일 수 있으며 실제 현장 고장 확률이나 "
-            "정비 허가가 아닙니다. 신규 독립 정상 베어링 오경보율은 미검증입니다."
+            "주의: 기존 연구에서 손상으로 확인된 베어링을 모델이 정상 쪽으로 "
+            "놓친 미탐 사례가 다시 나타났습니다. 절대 안전하다는 판단이 아닙니다."
+            if missed_damage else
+            "원본 Paderborn RAR 및 80개 센서 측정파일을 실제 검증해 기존 연구 "
+            "모델로 계산했습니다. 이미 학습·평가에 사용한 베어링이며 새 독립 "
+            "시험이 아닙니다. 현장 고장 확률이나 정비 허가가 아닙니다."
         ),
     }
-
 
 async def inspect_original_rar(request: Request) -> dict:
     """HTTP-only local stream; no filename/absolute path supplied by user."""
