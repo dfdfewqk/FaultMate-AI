@@ -64,6 +64,20 @@ async def run():
         assert await page.locator('#knowledge-panel').evaluate('(el) => !el.open')
         assert await page.locator('#triage-more').evaluate('(el) => !el.open')
         counts["ui_checks"] += 3
+        # The absence of a key is distinct from a failed local-server lookup.
+        # A manual status refresh must never send a paid request or ask for
+        # credential text in a browser field.
+        await page.locator("#ai-quick-start").click()
+        assert "키를 찾지 못했어요" in await page.locator("#agent-key-feedback").inner_text()
+        assert await page.locator("#agent-key-refresh").is_enabled()
+        await page.locator("#agent-key-refresh").click()
+        await page.wait_for_function(
+            "document.querySelector('#agent-key-refresh').disabled === false")
+        assert "키를 찾지 못했어요" in await page.locator("#agent-key-feedback").inner_text()
+        assert "API 키" in await page.locator("#agent-key-setup").inner_text()
+        assert await page.locator("#agent-run").is_disabled()
+        await page.locator("#integration-panel > summary").click()
+        assert await page.locator("#integration-panel").evaluate("(el) => !el.open")
         await page.screenshot(path='/mnt/data/FaultMate_AI_Simple_Initial.png',full_page=True)
 
         await page.locator("#triage-equipment").select_option("컨베이어")
@@ -140,10 +154,28 @@ async def run():
         assert await page.locator("#ml-run").is_disabled()
         counts["ui_checks"] += 3
         await page.locator("#triage-hazard").select_option("no")
-        assert await page.locator("#ml-run").is_enabled()
-        counts["ui_checks"] += 1
+        # No-file CSV action must stay disabled. The app has NO approved
+        # production CSV ML, and the button must not advertise an ML forecast.
+        assert await page.locator("#ml-run").is_disabled()
+        assert "형식 검사" in await page.locator("#ml-run").inner_text()
+        assert "예측 불가" in await page.locator("#ml-run").inner_text()
+        counts["ui_checks"] += 3
+        valid_csv = ("asset_id,trial_id,source_id,vibration_rms_m_s2,vibration_peak_m_s2,current_rms_a\\n"
+                     "bear1,run1,dataset,1.0,2.0,1.0\\n").replace("\\n", "\n").encode()
         await page.locator("#ml-upload").set_input_files({"name":"features.csv","mimeType":"text/csv",
-           "buffer":b"asset_id,trial_id,source_id,vibration_rms_m_s2,vibration_peak_m_s2,current_rms_a\nbear1,run1,dataset,1.0,2.0,1.0\n"})
+           "buffer":valid_csv})
+        assert await page.locator("#ml-run").is_enabled()
+        # Clearing the file while the page is open must relock the action.
+        await page.locator("#ml-upload").set_input_files([])
+        assert await page.locator("#ml-run").is_disabled()
+        await page.locator("#ml-upload").set_input_files({
+            "name":"wrong.txt","mimeType":"text/plain","buffer":b"not a csv"})
+        await page.locator("#ml-run").click()
+        assert ".csv" in await page.locator("#ml-feedback").inner_text()
+        await page.locator("#ml-upload").set_input_files({"name":"features.csv","mimeType":"text/csv",
+           "buffer":valid_csv})
+        assert await page.locator("#ml-run").is_enabled()
+        counts["ui_checks"] += 5
         await page.locator("#ml-run").click()
         await page.wait_for_function("document.querySelector('#ml-feedback').textContent.includes('검증된')")
         assert '검증된 베어링 ML 모델이 없으므로' in await page.locator("#ml-feedback").inner_text()
@@ -159,6 +191,52 @@ async def run():
         assert await page.locator("#ml-result").inner_text() == ""
         counts["ui_checks"] += 2
         delayed_ml = False
+        # The local FastAPI/proxy may return HTML for an oversized RAR. The
+        # operator must still see the correct 413 size error, not JSON parse
+        # failure, and must not see a fabricated bearing prediction.
+        async def rar_over_limit(route):
+            await route.fulfill(status=413, content_type="text/html",
+                                body="<p>proxy too large</p>")
+        await page.route("**/api/ml/experimental-original-rar", rar_over_limit)
+        await page.locator("#raw-rar-upload").set_input_files({
+            "name":"K001.rar", "mimeType":"application/octet-stream",
+            "buffer":b"FAKE_RAR_FOR_STATUS_TEST_ONLY"})
+        await page.evaluate("""() => {
+            const file = document.querySelector('#raw-rar-upload').files[0];
+            Object.defineProperty(file, 'size', {value:100000000});
+        }""")
+        await page.locator("#raw-rar-run").click()
+        await page.wait_for_function(
+            "document.querySelector('#raw-rar-feedback').textContent.includes('최대 768MiB')")
+        assert not (await page.locator("#raw-rar-result").inner_text()).strip()
+        await page.unroute("**/api/ml/experimental-original-rar", rar_over_limit)
+        counts["ui_checks"] += 2
+
+        # Changing the original RAR WHILE the local request has started must
+        # discard the old result and WARN that a server-side scan may continue.
+        rar_started = asyncio.Event()
+        async def delayed_rar_success(route):
+            rar_started.set()
+            await asyncio.sleep(.5)
+            try:
+                await route.fulfill(status=200, content_type="application/json",
+                    body='{"status":"experimental_unapproved","message":"OUTDATED_FILE_RESULT_NEVER_SHOW"}')
+            except Exception:
+                pass  # Browser canceled the read after the user changed file
+        await page.route("**/api/ml/experimental-original-rar", delayed_rar_success)
+        await page.locator("#raw-rar-run").click()
+        await asyncio.wait_for(rar_started.wait(), timeout=6)
+        await page.locator("#raw-rar-upload").set_input_files({
+            "name":"KI21.rar", "mimeType":"application/octet-stream",
+            "buffer":b"NEW_LOCAL_RAR_FILE_NO_REAL_SENSOR_DATA"})
+        assert "서버에서 계속될 수 있습니다" in await page.locator("#raw-rar-feedback").inner_text()
+        await page.wait_for_timeout(650)
+        assert "OUTDATED_FILE_RESULT_NEVER_SHOW" not in await page.locator("#raw-rar-feedback").inner_text()
+        assert not (await page.locator("#raw-rar-result").inner_text()).strip()
+        assert await page.locator("#raw-rar-run").is_enabled()
+        await page.unroute("**/api/ml/experimental-original-rar", delayed_rar_success)
+        counts["ui_checks"] += 4
+
         # Malformed fragments must not interrupt later UI interactions.
         await page.evaluate("location.hash = '%E0%A4%A'; window.dispatchEvent(new HashChangeEvent('hashchange'))")
         assert await page.locator("#ml-run").is_enabled()

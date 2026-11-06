@@ -140,9 +140,25 @@ def review(payload: AgentReviewRequest) -> dict:
                 'external_transfer_attempted':True, 'external_transfer_performed':None,
                 'error_code':reason,
                 'message':'AI 연결 또는 응답 검증에 실패했습니다. 동의한 자료가 외부로 전송되었을 수 있습니다. 로컬 진단 결과는 유지됩니다.'}
+    # AI may select only a subset. The remaining local candidates and questions
+    # must NOT disappear from the operator's decision-support display. All text
+    # comes from the vetted local preview; model freeform text is never returned.
+    selected_candidates = set(indices)
+    selected_questions = set(questions)
     return {**basic,'status':'reviewed','state':'candidate_review','external_transfer_performed':True,
             'user_consent_captured':True,'external_transfer_attempted':True,'agent_review':{
+        'case_id':context['case_id'],
+        'case_title':context['case_title'],
         'candidate_causes':[context['candidate_causes'][i] for i in indices],
+        'other_candidate_causes':[candidate for i,candidate in enumerate(context['candidate_causes'])
+                                  if i not in selected_candidates],
         'questions':[context['missing_evidence_questions'][i] for i in questions],
-        'sources':context['sources'], 'not_confirmed':True,
-    },'message':'AI가 기존 근거의 검토 순서만 제시했습니다. 원인 확정이나 작업 허가가 아닙니다.'}
+        'other_questions':[question for i,question in enumerate(context['missing_evidence_questions'])
+                           if i not in selected_questions],
+        'pending_observations':list(context['next_questions']),
+        'safety_gate':context['required_safety_gate'],
+        'stop_escalation':context['stop_escalation'],
+        'limitations':list(context['limitations']),
+        'sources':context['sources'],
+        'not_confirmed':True,
+    },'message':'AI는 기존 사례의 검토 순서만 제시했습니다. 우선 순위에서 빠진 후보와 질문도 삭제되지 않았으며, 고장 원인 확정이나 작업 허가는 아닙니다.'}

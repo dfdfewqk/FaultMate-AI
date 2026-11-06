@@ -13,13 +13,14 @@
     <div class="nav-caption">워크스페이스</div>
     <a class="nav-link selected" href="#diagnostic-panel">◇　고장 진단</a>
     <a class="nav-link" href="#knowledge-panel">▣　근거 자료실</a>
-    <a class="nav-link" href="#integration-panel">⚙　고급 분석</a>
+    <a class="nav-link" href="#integration-panel">⚙　AI 검토 · 베어링 테스트</a>
     <div class="nav-footer">안전한 외부 관찰과 기존 기록을 이용하세요.<br/>현장 작업 승인·고장 확정을 대신하지 않습니다.</div>
   </aside>
   <main>
     <div class="topline"><span class="status" id="status" role="status">서버 연결 확인 중</span></div>
-    <h1>설비 고장 진단</h1>
-    <p class="subhead">설비와 관찰한 증상을 입력해 관련 사례를 찾은 다음, 작업자가 선택한 사례의 원인 후보와 확인 항목을 검토합니다. <b>실제 원인을 확정하거나 작업을 승인하지 않습니다.</b></p>
+    <h1>설비 이상 원인 후보 검토</h1>
+    <p class="subhead">이 프로그램은 입력한 증상을 <b>기존 교육용 사례 7개</b>와 비교해 원인 후보와 확인할 기록을 정리합니다. 고장을 스스로 찾아내는 범용 AI는 아닙니다. <b>실제 원인을 확정하거나 작업을 승인하지 않습니다.</b></p>
+    <div class="operator-flow" aria-label="화면 사용 순서"><b>사용 순서</b><span>① 설비·증상 입력</span><span>② 사례 선택 후 후보 검토</span><span>③ 필요하면 AI 근거 재정렬 (별도 유료 API)</span><span>④ 베어링 RAR은 연구용 별도 테스트</span></div>
     <section class="panel" id="diagnostic-panel">
       <div class="sectionhead"><div><h2>증상 입력</h2></div></div>
       <p class="small-note">기본 진단은 로컬에서 처리되며 외부 AI로 전송되지 않습니다. 안전한 외부 관찰과 기존 기록만 사용하세요.</p>
@@ -52,8 +53,9 @@
         <p class="small-note" id="triage-feedback" role="status" aria-live="polite">진단 자료 로드 중입니다.</p>
       </form>
       <article id="triage-result" class="triage-result" aria-live="polite">입력 후 검토 버튼을 누르면 근거 기반 후보가 표시됩니다. 실제 고장 원인으로 확정되지 않습니다.</article>
+      <div class="ai-entry"><div><b>AI 버튼이 안 눌리나요?</b><p>예시 입력은 외부 AI 전송이 차단됩니다. 실제 사례 선택 → 전송 예정 자료 확인 → 동의 순서가 필요해요. 아래 버튼을 누르면 현재 막힌 이유를 볼 수 있습니다.</p></div><button type="button" id="ai-quick-start" class="secondary-button">AI 검토 단계·차단 이유 보기</button></div>
     </section>
-    <details class="panel expand-panel" id="integration-panel"><summary class="expand-summary"><span><b>고급 분석</b><small>AI 근거 검토 · ML 데이터 · 연결 상태</small></span><span class="summary-hint">필요할 때 펼치기</span></summary>
+    <details class="panel expand-panel" id="integration-panel"><summary class="expand-summary"><span><b>AI 근거 검토 · 베어링 테스트</b><small>AI는 기존 원인 후보·질문 정리만 합니다. ML 실험은 별도입니다.</small></span><span class="summary-hint">필요할 때 펼치기</span></summary>
       <div class="integration-grid">
         <div class="integration-item"><span>DeepSeek AI 에이전트</span><strong id="integration-agent">상태 조회 중</strong><small class="integration-technical">연결 표기: <span id="agent-status">상태 확인 중</span></small></div>
         <div class="integration-item"><span>ML 모델 · 예측</span><strong id="integration-ml">상태 조회 중</strong></div>
@@ -61,7 +63,15 @@
       </div>
       <p id="integration-detail" class="small-note" role="status">로컬 API에서 연결 상태를 확인하고 있습니다. 연결 전에는 규칙 기반 진단만 사용합니다.</p>
       <div id="agent-controls" class="integration-extra">
-        <h3>AI 근거 검토 (선택 기능)</h3>
+        <h3>AI 근거 검토 (선택 · 유료 DeepSeek API)</h3>
+        <p class="small-note">AI는 기존 원인 후보의 <b>검토 순서와 추가 질문</b>만 정리합니다. 새로운 고장을 확정하거나 실측 데이터를 학습하지 않습니다.</p>
+        <p class="small-note">① 실제 사례 선택 → ② 전송 예정 자료 확인 → ③ 명시적 동의 → ④ AI 검토 실행. 가상 예시·긴급 위험에는 외부 AI를 호출할 수 없습니다.</p>
+        <p id="agent-next-step" class="agent-next-step" role="status" aria-live="polite">AI 사용 조건 확인 중...</p>
+        <div class="agent-key-check" aria-label="서버에 이미 설정된 AI 키 인식 확인">
+          <div><b>기존 DeepSeek API 키 인식</b><p id="agent-key-feedback" role="status" aria-live="polite">로컬 서버의 키 설정 여부를 확인 중입니다. 키 원문은 읽거나 표시하지 않습니다.</p></div>
+          <button id="agent-key-refresh" type="button" class="secondary-button">기존 키 인식 다시 확인</button>
+        </div>
+        <details id="agent-key-setup" class="optional-fields"><summary>API 키 표시가 안 눌리나요? 키 설정 방법</summary><p class="small-note">‘키 설정됨 / API 키 없음’은 상태 표시이지 입력 버튼이 아닙니다. DeepSeek는 ChatGPT 구독과 별도 서비스예요. 사용할 경우 Windows의 서버 실행 환경변수 <code>DEEPSEEK_API_KEY</code>에 본인 키를 설정하고 프로그램을 완전히 다시 실행해야 합니다. 키를 웹 화면에 붙여 넣거나 채팅에 공유하지 마세요. 실제 외부 요청에는 요금이 발생할 수 있습니다.</p></details>
         <p class="small-note">선택된 사례·관찰과 공개 근거만 전송합니다. 입력한 원문 증상·알람·모델명은 전송하지 않습니다. 전송 전 내용을 확인하고 매 요청마다 동의해야 합니다.</p>
         <div class="form-actions"><button type="button" class="secondary-button" id="agent-preview">AI 전송 예정 자료 확인</button></div>
         <pre id="agent-preview-content" class="data-preview" hidden></pre>
@@ -72,10 +82,10 @@
       </div>
       <div id="ml-controls" class="integration-extra">
         <h3>베어링 측정 데이터 ML (선택 기능)</h3>
-        <p class="small-note">기존 학습과 동일한 진동·전류 특성 CSV만 사용합니다. 검증 모델이 없으면 결과를 생성하지 않습니다. 데이터는 로컬 서버에서만 처리합니다.</p>
+        <p class="small-note"><b>현재 일반 CSV용 승인 ML 모델이 없어 예측 결과는 나오지 않습니다.</b> 이 칸에서는 입력 CSV 형식만 검증할 수 있습니다. 실제 연구용 점수 테스트는 바로 아래 ‘원본 RAR 자동 분석’에 K001.rar를 넣으세요. 데이터는 로컬 서버에서만 처리합니다.</p>
         <label for="ml-upload">측정 특성 CSV</label>
         <input type="file" id="ml-upload" accept=".csv,text/csv"/>
-        <div class="form-actions"><button type="button" id="ml-run">CSV 검증·ML 실행</button></div>
+        <div class="form-actions"><button type="button" id="ml-run" disabled>CSV 형식 검사 (ML 예측 불가)</button></div>
         <p id="ml-feedback" class="small-note" role="status"></p>
         <article id="ml-result" class="triage-result" aria-live="polite"></article>
       </div>

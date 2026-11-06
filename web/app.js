@@ -172,8 +172,8 @@
   });
   if (knowledgePanel.open) void ensureKnowledgeLoaded();
 
-  // P5 UI integration. All user/source text is inserted with textContent; no HTML injection.
-  // The frontend never calls an external server. Agent and ML remain Antigravity-owned.
+  // Current UI: render case/source text as text nodes, never dynamic markup.
+  // Browser talks to localhost only; paid AI is server-side, preview/consent gated.
   const triageForm = document.getElementById('triage-form');
   const triageEquipment = document.getElementById('triage-equipment');
   const triageCase = document.getElementById('triage-case');
@@ -214,6 +214,7 @@
   let suggestionController = null;
   let suggestionTimer = null;
   let demoMode = false;
+  let agentKeyConfigured = null; // status only; never a credential in client JS
   let agentConsent = null;
   let agentRun = null;
   let agentPreviewContent = null;
@@ -673,27 +674,54 @@
   const integrationMl = document.getElementById('integration-ml');
   const integrationTransfer = document.getElementById('integration-transfer');
   const integrationDetail = document.getElementById('integration-detail');
-  // The optional capabilities request may be slow; never block core diagnostic
-  // controls or registration of the AI/ML event listeners while checking it.
-  void (async () => {
+  // Only inspect the existing localhost capabilities endpoint. This does
+  // NOT inspect the key value, open a provider socket, or create paid traffic.
+  // Older successful responses must not overwrite a newer manual refresh.
+  const agentKeyFeedback = document.getElementById('agent-key-feedback');
+  const agentKeyRefresh = document.getElementById('agent-key-refresh');
+  let keyRefreshVersion = 0;
+  async function refreshLocalKeyPresence() {
+    const version = ++keyRefreshVersion;
+    agentKeyRefresh.disabled = true;
+    agentKeyFeedback.textContent = '기존 키의 설정 여부를 로컬 서버에서 확인 중... (외부 AI 호출 없음)';
     try {
-    const caps = await request('/api/integration/capabilities');
-    const agentReady = caps.agent?.connected === true;
-    const agentConfigured = caps.agent?.configured === true;
-    const mlReady = caps.ml?.connected === true && caps.ml?.trained === true && caps.ml?.inference_enabled === true;
-    integrationAgent.textContent = agentReady ? '연결 확인됨' : (agentConfigured ? '키 설정됨 · 실제 연결 미확인' : 'API 키 없음');
-    integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
-    integrationTransfer.textContent = agentConfigured ? '요청별 명시 동의 후 가능' : 'API 키 미설정 · 전송 없음';
-    integrationDetail.textContent = '로컬 연결 계약 ' + String(caps.contract_version || '미확인') + ' · 외부 AI는 매 요청 동의 필요. 실제 호출·모델 검증 상태를 과장하지 않습니다.';
-    document.getElementById('agent-status').textContent = agentReady ? '연결됨' : (agentConfigured ? '설정됨' : '미연결');
+      const caps = await request('/api/integration/capabilities');
+      if (version !== keyRefreshVersion) return;
+      if (typeof caps.agent?.configured !== 'boolean') throw new Error('invalid_key_status');
+      const agentConfigured = caps.agent.configured;
+      const mlReady = caps.ml?.connected === true && caps.ml?.trained === true && caps.ml?.inference_enabled === true;
+      agentKeyConfigured = agentConfigured;
+      // configured=true only means the server process sees the environment
+      // variable. It is NOT proof that DeepSeek accepts the key.
+      integrationAgent.textContent = agentConfigured
+        ? '기존 API 키 감지됨 · 외부 연결 미검증'
+        : '서버 프로세스에 API 키 없음';
+      integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
+      integrationTransfer.textContent = agentConfigured ? '미전송 · 요청별 동의 시에만 가능' : 'API 키 미설정 · 전송 없음';
+      integrationDetail.textContent = '로컬 설정 확인 완료 · DeepSeek 유료 API는 호출하지 않았습니다. 모델과 통신 상태는 별도입니다.';
+      document.getElementById('agent-status').textContent = agentConfigured ? '설정됨' : '미연결';
+      agentKeyFeedback.textContent = agentConfigured
+        ? '기존 키가 서버에서 감지됐어요. 다시 발급하거나 입력할 필요가 없습니다. DeepSeek 실제 연결 성공은 아직 미검증이고 이 확인으로 비용은 발생하지 않습니다.'
+        : '현재 실행 중인 서버에서 키를 찾지 못했어요. 이전에 키가 있었다면 프로그램을 실행한 Windows 계정·환경변수 DEEPSEEK_API_KEY를 확인한 후 서버를 다시 시작하세요. 이 화면에 키를 입력하지 마세요.';
     } catch (_e) {
-    integrationAgent.textContent = '상태 확인 실패';
-    integrationMl.textContent = '상태 확인 실패';
-    integrationTransfer.textContent = '확인 불가';
-    document.getElementById('agent-status').textContent = '상태 확인 실패';
-    integrationDetail.textContent = '연동 상태 API 응답이 없습니다. AI·ML은 검증되지 않았으며 로컬 규칙 기반 검토만 이용하세요.';
+      if (version !== keyRefreshVersion) return;
+      agentKeyConfigured = null;
+      integrationAgent.textContent = '로컬 설정 조회 실패 · 키 유무 미확인';
+      integrationMl.textContent = '상태 확인 실패';
+      integrationTransfer.textContent = '확인 불가';
+      document.getElementById('agent-status').textContent = '확인 실패';
+      integrationDetail.textContent = '로컬 설정 조회가 실패했습니다. 키가 없다고 판단하지 않고 기본 진단만 유지합니다.';
+      agentKeyFeedback.textContent = '서버 연결 오류로 키 유무를 확인하지 못했어요. 서버 상태를 확인하고 다시 누르세요. 외부 AI 호출은 하지 않았습니다.';
+    } finally {
+      if (version === keyRefreshVersion) {
+        agentKeyRefresh.disabled = false;
+        syncAgentButton();
+      }
+    }
   }
-  })();
+  agentKeyRefresh.addEventListener('click', () => { void refreshLocalKeyPresence(); });
+  // The optional status request must not delay core diagnosis or button handlers.
+  void refreshLocalKeyPresence();
   // Optional AI evidence review: each request requires explicit consent and preview.
   // Demo input, safety hold, or incomplete selection never initiates an AI request.
   agentConsent = document.getElementById('agent-consent');
@@ -702,14 +730,69 @@
   agentRun = document.getElementById('agent-run');
   const agentFeedback = document.getElementById('agent-feedback');
   agentResult = document.getElementById('agent-result');
+  const agentNextStep = document.getElementById('agent-next-step');
+  // Only allowlisted local error codes are translated. Never echo provider
+  // response bodies, upstream exception text or the server's API key.
+  const safeAgentFailureReasons = Object.freeze({
+    provider_authentication_failed: 'DeepSeek 인증 거부(401): 서버에 키가 있어도 유효하지 않거나 권한이 없을 수 있어요. 기존 키의 유효성·API 권한을 별도 계정에서 확인하세요.',
+    provider_insufficient_balance: 'DeepSeek API 잔액 부족(402): 웹 구독과 API 결제는 별도예요. 계정의 API 사용 잔액을 확인하세요.',
+    provider_rate_limited: 'DeepSeek 요청 제한(429): 현재 서비스가 요청을 제한하고 있어요. 자동 재시도하지 않습니다.',
+    provider_request_rejected: 'DeepSeek가 요청을 거부했어요(400/422). 모델·요청 형식에 문제가 있을 수 있어요. 유료 재호출 전에 코드와 요청 조건을 검토해야 해요.',
+    provider_overloaded: 'DeepSeek 서버 과부하(503): 서비스가 처리하지 못했어요. 자동 재시도하지 않습니다.',
+    provider_server_error: 'DeepSeek 서버 오류(500): 서비스가 요청을 완료하지 못했어요. 자동 재시도하지 않습니다.',
+    provider_timeout: 'AI 응답 시간 초과: 전송됐는지와 요금 발생 여부를 확인할 수 없어요. 자동 재시도하지 않습니다.',
+    provider_network_error: '네트워크 연결 실패: 요청이 이미 전송됐을 가능성을 배제할 수 없어요. 자동 재시도하지 않습니다.',
+    provider_http_error: 'DeepSeek HTTP 오류: 응답 상태를 확인하지 못했어요. 반복 호출 전에 계정과 서비스 상태를 확인하세요.',
+    provider_transport_or_response_invalid: 'AI 연결 또는 응답 형식 검증에 실패했어요. 임의 지시나 불완전한 결과는 표시하지 않았습니다.',
+  });
+  function explainAgentFailure(errorCode) {
+    return typeof errorCode === 'string' && Object.prototype.hasOwnProperty.call(safeAgentFailureReasons, errorCode)
+      ? safeAgentFailureReasons[errorCode]
+      : 'AI 요청에 실패했지만 상세 오류를 안전하게 확인할 수 없어요. 자동 재시도하지 않습니다.';
+  }
+  // This shortcut NEVER calls DeepSeek; it only reveals the existing controls
+  // and the exact reason the paid button cannot yet be used.
+  document.getElementById('ai-quick-start').addEventListener('click', () => {
+    const panel = document.getElementById('integration-panel');
+    panel.open = true;
+    syncAgentButton();
+    document.getElementById('agent-controls').scrollIntoView({behavior:'smooth', block:'start'});
+  });
   function syncAgentButton() {
     if (!agentRun || !agentConsent) return;
     agentPreviewButton.disabled = triageHazard.value === 'yes';
+    const previewValid = !!agentReviewedContextHash && lastPreviewVersion === agentPreviewVersion;
     agentRun.disabled = !triageCase.value || !triageOptions || demoMode || triageHazard.value === 'yes' ||
-      !agentConsent.checked || !agentReviewedContextHash || lastPreviewVersion !== agentPreviewVersion || !!agentRequestController;
+      !agentConsent.checked || !previewValid || !!agentRequestController;
+    if (agentNextStep) {
+      let help;
+      if (triageHazard.value === 'yes') {
+        help = '긴급 위험이 선택되어 AI 요청이 차단됐습니다. 현장 비상 절차를 우선하세요.';
+      } else if (!triageOptions || !triageCase.value) {
+        help = '① 먼저 위 진단 화면에서 설비 종류와 검토할 사례를 직접 선택하세요.';
+      } else if (demoMode) {
+        help = '예시 입력은 실제 설비 자료가 아니어서 외부 AI 요청이 차단됩니다. 테스트 결과는 로컬 진단으로 확인하세요.';
+      } else if (agentRequestController) {
+        help = 'AI 요청 처리 중입니다. 응답이 없더라도 서버에 자료가 전달되었을 수 있습니다.';
+      } else if (!previewValid) {
+        help = agentKeyConfigured === false
+          ? '현재 DeepSeek API 키가 없습니다. 실제 유료 호출은 불가능합니다. ② 먼저 아래 ‘AI 전송 예정 자료 확인’으로 전송 내용만 로컬에서 확인할 수 있습니다.'
+          : '② 아래 ‘AI 전송 예정 자료 확인’ 버튼을 누르면 외부로 보낼 정보가 표시됩니다. 아직 전송되지는 않습니다.';
+      } else if (!agentConsent.checked) {
+        help = '③ 미리보기 내용을 확인했다면 바로 아래 동의 체크박스를 선택하세요. 체크만으로는 전송되지 않습니다.';
+      } else if (agentKeyConfigured === false) {
+        help = '④ 버튼이 활성화됐지만 서버에 DeepSeek API 키가 없어 실제 호출할 수 없습니다. 아래 키 설정 안내를 확인하세요.';
+      } else if (agentKeyConfigured === null) {
+        help = '④ 버튼이 활성화됐지만 서버 연결 상태를 확인하지 못했습니다. 요청하면 전송될 수 있으니 키와 동의 여부를 확인하세요.';
+      } else {
+        help = '④ ‘AI 근거 검토 실행’을 누르면 외부 DeepSeek로 선택된 근거가 전송되며 API 비용이 발생할 수 있습니다.';
+      }
+      agentNextStep.textContent = help;
+    }
   }
   function invalidateAgentReview() {
     if (!agentConsent || !agentRun) return;
+    const paidRequestAlreadyStarted = !!agentRequestController;
     ++agentPreviewVersion;
     lastPreviewVersion = -1;
     agentReviewedContextHash = null;
@@ -718,6 +801,11 @@
     agentPreviewContent.textContent = '';
     agentResult.replaceChildren();
     agentConsent.checked = false;
+    if (paidRequestAlreadyStarted) {
+      // AbortController only cancels this browser's wait. It CANNOT undo a
+      // previously transmitted paid request in the server's worker thread.
+      agentFeedback.textContent = '입력이 변경되어 이전 AI 결과 표시를 중단했어요. 이미 보낸 외부 요청은 계속 처리되거나 비용이 발생했을 수 있어요. 중복 요청하지 말고 사용 내역을 확인하세요.';
+    }
     syncAgentButton();
   }
   agentConsent.addEventListener('change', syncAgentButton);
@@ -775,19 +863,67 @@
       if (version !== agentPreviewVersion || triageHazard.value === 'yes' || controller.signal.aborted) return;
       agentResult.replaceChildren();
       add(agentResult,'p',result.message || 'AI 응답을 확인할 수 없습니다.','small-note');
+      if (result.status === 'error') {
+        add(agentResult, 'p', explainAgentFailure(result.error_code), 'agent-failure-reason');
+        add(agentResult, 'p', 'AI 요청이 전송됐을 수 있고 요금 발생 여부는 확인되지 않았어요. 자동 재요청하지 않습니다. 로컬 진단 결과는 그대로 사용하세요.', 'small-note');
+      }
       if (result.status === 'reviewed' && result.agent_review) {
-        add(agentResult,'h4','AI 참고 검토 순서 · 원인 미확정');
-        for (const c of result.agent_review.candidate_causes) {
-          add(agentResult,'p',c.candidate + ' — ' + c.why_to_consider,'result-note');
+        const review = result.agent_review;
+        const prioritized = review.candidate_causes || [];
+        const remaining = review.other_candidate_causes || [];
+        const sourceById = new Map((review.sources || []).map(src => [src.id, src]));
+        add(agentResult,'h3','AI 참고 검토 결과 · 원인 미확정');
+        add(agentResult,'p','대상: ' + review.case_title + ' (' + review.case_id + ') · 기존 후보 ' +
+          (prioritized.length + remaining.length) + '개 중 AI가 먼저 확인할 후보 ' +
+          prioritized.length + '개를 제안했습니다. 나머지 후보도 유효성 검토 대상입니다.','agent-result-summary');
+        add(agentResult,'p','AI는 기존 등록 자료에서 확인 순서만 골랐습니다. 새로운 고장 원인·확률·정비 명령은 생성하지 않았습니다.','small-note');
+
+        // Only locally curated references can be displayed. Never insert
+        // untrusted model free text or external links through dynamic markup.
+        function renderCauseWithEvidence(c, firstPriority, number) {
+          const entry = document.createElement('section');
+          entry.className = firstPriority ? 'agent-cause agent-cause-priority' : 'agent-cause';
+          agentResult.appendChild(entry);
+          add(entry,'b',(firstPriority ? 'AI 우선 검토 ' + number : '기존 후보 유지') +
+            ' · ' + c.candidate);
+          add(entry,'p','등록된 검토 사유: ' + c.why_to_consider,'result-note');
+          add(entry,'p','기존 관찰 분류: ' + c.review_group + ' · 현장 사실 확인 전','small-note');
+          for (const sourceId of c.source_ids || []) {
+            const source = sourceById.get(sourceId);
+            if (!source) continue;
+            addSafeSourceLink(entry, source, '근거 ' + source.id + ': ' + source.organization + ' — ' + source.title);
+            add(entry,'p','적용 한계: ' + source.limit,'small-note');
+          }
         }
-        add(agentResult,'h4','사용된 참고 자료·적용 한계');
-        for (const src of result.agent_review.sources) {
-          addSafeSourceLink(agentResult, src, src.organization + ' — ' + src.title);
-          add(agentResult,'p',src.limit,'small-note');
+        add(agentResult,'h4','1. 먼저 확인할 기존 원인 후보 (AI 선택)');
+        prioritized.forEach((c, idx) => renderCauseWithEvidence(c,true,idx + 1));
+        if (remaining.length) {
+          add(agentResult,'h4','2. AI 우선 목록 밖의 기존 후보 · 배제되지 않음');
+          add(agentResult,'p','AI가 우선으로 고르지 않았다는 사실은 해당 원인을 배제했다는 뜻이 아닙니다.','small-note');
+          remaining.forEach(c => renderCauseWithEvidence(c,false,0));
         }
-        if (result.agent_review.questions.length) {
-          add(agentResult,'h4','추가 확인 질문');
-          addList(agentResult,result.agent_review.questions);
+        add(agentResult,'h4','3. 부족한 정보·확인할 기존 기록');
+        if (review.questions?.length) {
+          add(agentResult,'p','AI가 먼저 확인하도록 고른 추가 질문','result-note');
+          addList(agentResult, review.questions);
+        }
+        if (review.other_questions?.length) {
+          add(agentResult,'p','우선 순위 밖의 추가 질문 · 여전히 확인 필요','result-note');
+          addList(agentResult, review.other_questions);
+        }
+        if (review.pending_observations?.length) {
+          add(agentResult,'p','기존 기록·원격 관찰에서 아직 확인되지 않은 항목','result-note');
+          addList(agentResult, review.pending_observations.map(q => q.question));
+        }
+        if (!(review.questions?.length || review.other_questions?.length || review.pending_observations?.length)) {
+          add(agentResult,'p','현재 목록에 추가 확인 항목은 없지만 원인 확정이나 안전 인증은 아닙니다.','small-note');
+        }
+        add(agentResult,'h4','4. 반드시 지킬 안전 조건');
+        add(agentResult,'p',review.safety_gate,'result-hold');
+        add(agentResult,'p','중단·보고 기준: ' + review.stop_escalation,'result-note');
+        if (review.limitations?.length) {
+          add(agentResult,'h4','적용 한계');
+          addList(agentResult,review.limitations);
         }
       }
       // A provider timeout/error may occur AFTER an HTTP request was sent.
@@ -807,37 +943,49 @@
       }
     }
   });
+  syncAgentButton();
   const mlInput = document.getElementById('ml-upload');
   const mlRun = document.getElementById('ml-run');
   const mlFeedback = document.getElementById('ml-feedback');
   const mlResult = document.getElementById('ml-result');
   let mlRequestVersion = 0;
   let activeMlController = null;
+  // CSV has NO approved inference model. A file must be present before the
+  // operator can check its format, even after hazard toggles and resets.
+  function syncMlControls() {
+    const hazard = triageHazard.value === 'yes';
+    mlInput.disabled = hazard;
+    mlRun.disabled = hazard || !!activeMlController ||
+      !(mlInput.files && mlInput.files.length);
+  }
   function invalidateMl(message) {
     ++mlRequestVersion;
+    const pending = !!activeMlController;
     if (activeMlController) { activeMlController.abort(); activeMlController = null; }
     mlResult.replaceChildren();
-    mlFeedback.textContent = message;
-    mlRun.disabled = triageHazard.value === 'yes';
-    mlInput.disabled = triageHazard.value === 'yes';
+    mlFeedback.textContent = pending
+      ? message + ' 이미 전달된 로컬 검사는 서버에서 이어질 수 있지만 이전 결과를 다시 표시하지 않습니다.'
+      : message;
+    syncMlControls();
   }
   mlInput.addEventListener('change', () => invalidateMl('파일이 변경되었습니다. 새 파일을 검토하세요.'));
   triageHazard.addEventListener('change', () => {
     invalidateMl(triageHazard.value === 'yes' ? '긴급 위험: 분석을 중단했습니다.' : '필요한 경우 CSV를 선택해 분석하세요.');
   });
-  mlRun.disabled = triageHazard.value === 'yes';
-  mlInput.disabled = triageHazard.value === 'yes';
+  syncMlControls();
   mlRun.addEventListener('click', async () => {
     if (triageHazard.value === 'yes') { invalidateMl('긴급 위험: 분석을 중단했습니다.'); return; }
+    if (activeMlController) return;
     const file = mlInput.files && mlInput.files[0];
-    if (!file || file.size > 256000) {
-      invalidateMl('256KB 이하의 특성 CSV 파일을 선택하세요.'); return;
+    if (!file || !file.name.toLowerCase().endsWith('.csv') ||
+        file.size <= 0 || file.size > 256000) {
+      invalidateMl('비어 있지 않은 256KB 이하의 특성 .csv 파일을 선택하세요.'); return;
     }
     const version = ++mlRequestVersion;
     const controller = new AbortController();
     activeMlController = controller;
     mlResult.replaceChildren();
-    mlRun.disabled = true;
+    syncMlControls();
     mlFeedback.textContent = '로컬 CSV 검토 중...';
     try {
       const response = await fetch('/api/ml/inspect',{method:'POST',headers:{'Content-Type':'text/csv'},
@@ -856,7 +1004,7 @@
     } finally {
       if (version === mlRequestVersion) {
         activeMlController = null;
-        mlRun.disabled = triageHazard.value === 'yes';
+        syncMlControls();
       }
     }
   });
@@ -868,9 +1016,12 @@
   let researchController = null;
   function invalidateResearch(message) {
     ++researchVersion;
+    const pending = !!researchController;
     if (researchController) { researchController.abort(); researchController = null; }
     researchResult.replaceChildren();
-    researchFeedback.textContent = message;
+    researchFeedback.textContent = pending
+      ? message + ' 이미 전달된 로컬 서버 검사는 계속될 수 있지만 이전 결과를 다시 표시하지 않습니다.'
+      : message;
     researchInput.disabled = triageHazard.value === 'yes';
     researchRun.disabled = triageHazard.value === 'yes' || !researchInput.files || !researchInput.files.length;
   }
@@ -945,12 +1096,15 @@
   let rawRarController = null;
   function invalidateRawRar(message) {
     ++rawRarVersion;
+    const pending = !!rawRarController;
     if (rawRarController) {
       rawRarController.abort();
       rawRarController = null;
     }
     rawRarResult.replaceChildren();
-    rawRarFeedback.textContent = message;
+    rawRarFeedback.textContent = pending
+      ? message + ' 전송된 원본 검사는 서버에서 계속될 수 있습니다. 이전 결과는 폐기했습니다.'
+      : message;
     rawRarInput.disabled = triageHazard.value === 'yes';
     rawRarRun.disabled = triageHazard.value === 'yes' ||
       !(rawRarInput.files && rawRarInput.files.length);
@@ -989,7 +1143,8 @@
         },
         body:file, cache:'no-store',signal:controller.signal,
       });
-      const result = await res.json();
+      // A Windows proxy / local HTTP failure may return HTML rather than
+      // JSON on 409/413/507. Preserve actionable status even in that case.
       if (version !== rawRarVersion || controller.signal.aborted ||
           triageHazard.value === 'yes') return;
       if (!res.ok) {
@@ -1000,6 +1155,9 @@
           '원본 RAR 형식·종류 또는 요청을 확인할 수 없습니다. 예측하지 않았습니다.';
         return;
       }
+      const result = await res.json();
+      if (version !== rawRarVersion || controller.signal.aborted ||
+          triageHazard.value === 'yes') return;
       rawRarFeedback.textContent = result.message ||
         '원본 데이터의 검증에 실패하여 예측하지 않았습니다.';
       if (result.status === 'experimental_unapproved' &&

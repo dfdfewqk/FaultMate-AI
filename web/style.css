@@ -99,3 +99,41 @@ h1{font-size:clamp(27px,3vw,35px);margin:20px 0 10px}
 .result-copy-button:disabled{opacity:.65;cursor:progress}
 .result-copy-feedback{font-size:12px;color:#48617c;line-height:1.45}
 .integration-technical{font-size:11px;color:#6b7d92}
+
+
+/* Operator-facing help for an opt-in, possibly paid provider. No new request path. */
+.operator-flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:15px 0 18px;padding:12px 14px;background:#eff5fd;border:1px solid #d9e6f7;border-radius:11px;font-size:12px;line-height:1.6;color:#284b78}
+.operator-flow b{margin-right:4px}.operator-flow span{padding:4px 9px;border-radius:7px;background:white;border:1px solid #dce7f5}
+.ai-entry{border-top:1px solid #dfe8f4;margin-top:20px;padding-top:18px;display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+.ai-entry b{font-size:13px;color:#203d5e}.ai-entry p{font-size:12px;line-height:1.7;color:#596e8a;margin:5px 0}
+.ai-entry>div{flex:1 1 300px}.ai-entry button{font:inherit;background:#e9eef8;border:1px solid #bfd0ec;border-radius:9px;padding:12px 16px;color:#204e87;font-size:12px;font-weight:700;cursor:pointer}
+.ai-entry button:hover,.ai-entry button:focus-visible{background:#dce9fc;outline:2px solid #a0c1f1}
+.agent-next-step{border-radius:11px;border:1px solid #b9d1ee;background:#eef6ff;color:#214970;font-size:13px;line-height:1.7;font-weight:700;padding:12px 15px;margin:13px 0}
+#agent-key-setup{margin:12px 0}#agent-key-setup summary{cursor:pointer;font-weight:700;font-size:12px;color:#365373}
+#agent-key-setup code{font-size:12px}#agent-controls{scroll-margin-top:22px}
+@media(max-width:650px){.operator-flow span{width:100%}.ai-entry button{width:100%}}
+
+
+/* Existing DeepSeek key metadata recheck: never a credential entry field. */
+.agent-key-check{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px;border:1px solid #cfdff2;border-radius:10px;background:#f4f8fd;margin:14px 0}
+.agent-key-check>div{min-width:220px;flex:1 1 320px}.agent-key-check b{display:block;color:#23496e;font-size:13px}
+.agent-key-check p{font-size:12px;line-height:1.6;color:#475f80;margin:7px 0 0}
+.agent-key-check button{font:inherit;font-size:12px;font-weight:700;color:#204e87;border:1px solid #b5c9e6;border-radius:9px;padding:11px 13px;background:#fff;cursor:pointer}
+.agent-key-check button:disabled{opacity:.65;cursor:progress}
+.agent-key-check button:focus-visible{outline:2px solid #3471cc;outline-offset:2px}
+
+
+/* Safe, specific error guidance after a consented DeepSeek attempt. */
+.agent-failure-reason{border:1px solid #ecc8a9;background:#fff5e9;color:#784b25;border-radius:9px;padding:12px 14px;font-size:13px;font-weight:650;line-height:1.65}
+#agent-feedback[role=status]{overflow-wrap:anywhere}
+
+
+/* AI review is a citable ordering of the SAME original case candidates,
+   not a diagnosis or a reduction of the safety review scope. */
+.agent-result-summary{font-weight:700;color:#294763;background:#edf4fc;border:1px solid #d0e0f2;padding:12px 14px;border-radius:9px;line-height:1.65}
+.agent-cause{background:#f6f9fd;border:1px solid #dee7f3;border-radius:10px;padding:12px 14px;margin:11px 0}
+.agent-cause-priority{background:#f0f6ff;border-left:4px solid #4784c9}
+.agent-cause b{display:block;color:#243c56;font-size:13px}
+.agent-cause p{margin:8px 0 4px}
+.agent-cause a{display:block;font-size:12px;overflow-wrap:anywhere}
+#agent-result h4{margin-top:21px}

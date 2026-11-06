@@ -1,8 +1,8 @@
-"""Produce a small, deterministic, citation-backed context preview for a future AI agent.
+"""Produce a small, deterministic, citation-backed context preview for optional AI review.
 
-IMPORTANT: This module NEVER sends data to DeepSeek and never infers a fault.
-The output is a *preview*; consent and external transmission must be implemented
-separately by the Antigravity agent with an explicit, per-request user action.
+This module NEVER sends data to DeepSeek and never infers a fault. The separate
+review endpoint requires explicit per-request consent and an exact preview hash
+before any outbound request. No raw symptom/alarm/model text is sent.
 """
 from __future__ import annotations
 
