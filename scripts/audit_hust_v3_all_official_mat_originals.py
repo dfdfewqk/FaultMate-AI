@@ -73,9 +73,17 @@ def verify_shard(shard: int, shard_count: int, downloader=_get_url):
         try:
             doc = loadmat(io.BytesIO(raw), squeeze_me=True)
             wave = np.asarray(doc["data"])
-            if (wave.size < 500_000 or not np.issubdtype(wave.dtype, np.number)
-                    or not np.isfinite(wave).all()):
-                raise PublicSourceError("source_original_numeric_vibration_invalid:" + entry["name"])
+            # The publication describes nominal 10s x 51.2kHz, but actual
+            # original recording lengths may differ. Verify and REPORT each
+            # original length rather than fabricating samples or silently
+            # deleting valid publisher-checksummed files from the cohort.
+            if (wave.size < 16 or not np.issubdtype(wave.dtype, np.number)
+                    or np.iscomplexobj(wave) or not np.isfinite(wave).all()):
+                raise PublicSourceError(
+                    "source_original_numeric_vibration_invalid:" +
+                    entry["name"] + ":samples=" + str(wave.size))
+        except PublicSourceError:
+            raise
         except (KeyError, TypeError, ValueError, NotImplementedError) as exc:
             raise PublicSourceError("source_original_mat_unreadable:" + entry["name"]) from exc
         m = NAME.fullmatch(entry["name"])
@@ -86,6 +94,7 @@ def verify_shard(shard: int, shard_count: int, downloader=_get_url):
             "publisher_byte_count": entry["size"],
             "actual_byte_count": len(raw),
             "observed_vibration_samples": int(wave.size),
+            "matches_published_nominal_10sec_51200hz": bool(wave.size == 512000),
             "file_name_fault_code": m["fault"],
             "file_name_bearing_type_code": m["type"],
             "file_name_load_code": m["load"],
@@ -129,7 +138,7 @@ def merge_shards(folder: Path):
         or any(r["publisher_sha_and_actual_bytes_match"] is not True
                or r["publisher_sha256"] != r["actual_bytes_sha256"]
                or r["publisher_byte_count"] != r["actual_byte_count"]
-               or r["observed_vibration_samples"] < 500_000
+               or r["observed_vibration_samples"] < 16
                or NAME.fullmatch(r["original_name"]) is None
                for r in records)):
         raise PublicSourceError("source_shards_incomplete_or_corrupt")
@@ -152,6 +161,12 @@ def merge_shards(folder: Path):
         "observed_normal_file_names": normal_names,
         "observed_normal_file_naming_codes": normal_codes,
         "observed_normal_code_count": len(normal_codes),
+        "originals_with_nominal_512000_samples": sum(
+            r["observed_vibration_samples"] == 512000 for r in records),
+        "originals_with_other_recording_lengths": [
+            {"file": r["original_name"], "sample_count": r["observed_vibration_samples"]}
+            for r in records if r["observed_vibration_samples"] != 512000
+        ],
         "original_paper_reported_healthy_physical_prototypes": 3,
         "naming_vs_paper_healthy_specimen_count_requires_author_confirmation":
             len(normal_codes) != 3,
