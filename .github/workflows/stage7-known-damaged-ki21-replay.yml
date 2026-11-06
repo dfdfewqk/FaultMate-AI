@@ -21,6 +21,7 @@ on:
       - work/faultmate-p7-step2-ai-result-flow-lock-20261106
       - work/faultmate-ml-retrospective-normal-evidence-20261106
       - work/faultmate-ml-new-source-si-provenance-gate-20261106
+      - work/faultmate-ml-paderborn-raw-si-mat-unit-audit-20261106
   pull_request:
     branches:
       - main
