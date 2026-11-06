@@ -49,6 +49,8 @@ def _synthetic_fixture():
             "features": [{
                 "feature": name,
                 "raw_unitless_median": value,
+                "raw_unitless_q25": value - .0003,
+                "raw_unitless_q75": value + .0003,
                 "condition_median_z_vs_training_bearing_scaler": value/.01,
             } for name in CURRENT_NAMES],
         })
@@ -83,6 +85,18 @@ def test_grouped_reference_has_ten_physical_bearings_not_796_independent_tests()
             assert f["development_damaged_physical_bearings"] == 5
             assert 0 <= f["number_of_dev_bearings_with_lower_condition_median"] <= 10
             assert f["not_an_independent_accuracy_or_calibrated_outlier_test"] is True
+            dispersion = f["within_bearing_trial_dispersion"]
+            assert dispersion["trials_not_independent_bearings"] is True
+            assert dispersion["not_an_independent_repeat_extraction_test"] is True
+            assert dispersion["ki21_original_trials"] == 20
+            assert dispersion["dev_bearings"] == 10
+            assert dispersion["ki21_trial_iqr_unitless"] == pytest.approx(.0006)
+            assert dispersion["ki21_trial_iqr_in_frozen_training_scale_units"] == pytest.approx(.06)
+            assert dispersion["dev_ten_bearing_trial_iqr_median"] == pytest.approx(.0095)
+            expected_min = .0075 if condition["condition"] == sorted(OFFICIAL_CONDITIONS)[0] else .0095
+            assert dispersion["dev_ten_bearing_trial_iqr_min"] == pytest.approx(expected_min)
+            assert dispersion["dev_ten_bearing_trial_iqr_max"] == pytest.approx(.0095)
+            assert dispersion["ki21_trial_iqr_below_all_ten_dev_bearing_iqr"] is True
 
 
 def test_nondev_or_ki21_data_must_not_enter_dev_reference():
@@ -133,3 +147,22 @@ def test_label_and_nonfinite_features_cannot_pass_dev_reference():
     bad[0]["features"][6] = float("inf")
     with pytest.raises(ValueError, match="invalid_source_verified_development_features"):
         compare_ki21_to_verified_development(report, bad, provenance, model)
+
+
+def test_invalid_quantiles_and_trial_order_report_consistency():
+    report, rows, provenance, model = _synthetic_fixture()
+    original = compare_ki21_to_verified_development(report, rows, provenance, model)
+    # Shuffling the 796 derived record order should not alter any
+    # physical-bearing grouped statistics; original report hashes remain
+    # unchanged in the actual verified_dev_rows caller.
+    shuffled = list(reversed(rows))
+    again = compare_ki21_to_verified_development(report, shuffled, provenance, model)
+    assert original == again
+    malformed = deepcopy(report)
+    malformed["condition_rows"][0]["features"][0]["raw_unitless_q25"] = float("nan")
+    with pytest.raises(ValueError, match="invalid_verified_ki21_trial_quantiles"):
+        compare_ki21_to_verified_development(malformed, rows, provenance, model)
+    malformed = deepcopy(report)
+    malformed["condition_rows"][0]["features"][0]["raw_unitless_q75"] = -2
+    with pytest.raises(ValueError, match="invalid_verified_ki21_trial_quantiles"):
+        compare_ki21_to_verified_development(malformed, rows, provenance, model)
