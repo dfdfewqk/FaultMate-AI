@@ -1,0 +1,12 @@
+{
+  "schema": "faultmate_external_original_bearing_file_intake_v1",
+  "status": "candidate_not_author_verified",
+  "source_id": "hust_bearing_v3",
+  "primary_dataset_url": "https://data.mendeley.com/datasets/cbv7jyx4p9/3",
+  "license": "CC BY 4.0",
+  "source_numeric_si_calibration_verified": false,
+  "physical_label_provenance_author_verified": false,
+  "automatically_activate_runtime_model": false,
+  "proposed_specimens": [],
+  "note": "This is not the original HUST signal archive. Supply locally downloaded, official SHA-checked source file paths and claimed IDs under proposed_specimens ONLY after verifying publisher file listing. Do not infer 3 new healthy bearings as suitable for the frozen Paderborn two-channel model. No data download is performed by this manifest."
+}

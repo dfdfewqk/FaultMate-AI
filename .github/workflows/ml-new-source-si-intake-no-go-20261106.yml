@@ -1,0 +1,57 @@
+name: FaultMate ML external new source and SI evidence no-go gates
+on:
+  push:
+    branches:
+      - work/faultmate-ml-new-source-si-provenance-gate-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-source-intake-readiness:
+    name: New original source byte-hash gate and no falsely verified SI or health labels
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing science/runtime test requirements (no provider calls)
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Actual source intake protection and prior preflight tests
+        run: |
+          python -m pytest -q tests/test_verify_new_bearing_original_files.py tests/test_independent_bearing_preflight.py
+          python -m compileall -q scripts/verify_new_bearing_original_files.py
+      - name: Actually inspect the publisher-metadata-only HUST candidate WITHOUT inventing downloaded data
+        run: |
+          python scripts/verify_new_bearing_original_files.py \
+            --manifest docs/experiments/HUST_UNVERIFIED_SOURCE_INTAKE_CANDIDATE_20261106.json \
+            --original-root docs/experiments > /tmp/hust_original_intake.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from faultmate.integration.ml import load_validated_model
+          d=json.loads(Path('/tmp/hust_original_intake.json').read_text())
+          assert d['status']=='NO_NEW_ORIGINAL_BYTES_SUPPLIED'
+          assert d['verified_original_file_count']==0
+          assert d['new_independent_validation'] is False
+          assert d['production_ml_activation'] is False
+          assert load_validated_model() is None
+          print('REAL_HUST_PUBLICATION_ONLY_NO_RAW_SIGNAL_OR_SI_ASSERTION_NO_GO_PASS')
+          PY
+      - name: Recheck existing 12-bearing source limitations and unapproved model policy
+        run: |
+          python scripts/audit_independent_bearing_preflight.py > /tmp/independent_gate.log
+          python scripts/decide_bearing_ml_application.py > /tmp/ml_decision.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/ml_decision.json',encoding='utf-8'))
+          assert d['production_ml_activation_allowed'] is False
+          assert d['source_si_unit_calibration_verified'] is False
+          assert d['new_independent_healthy_bearings_original_signals_verified'] == 0
+          print('UNVERIFIED_SENSOR_SI_AND_NEW_NORMAL_SOURCE_BLOCKED')
+          PY

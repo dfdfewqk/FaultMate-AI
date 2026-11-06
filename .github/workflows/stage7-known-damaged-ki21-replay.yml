@@ -20,6 +20,7 @@ on:
       - work/faultmate-p7-final-pr40-44-consolidation-cleanup-20261106
       - work/faultmate-p7-step2-ai-result-flow-lock-20261106
       - work/faultmate-ml-retrospective-normal-evidence-20261106
+      - work/faultmate-ml-new-source-si-provenance-gate-20261106
   pull_request:
     branches:
       - main
@@ -31,6 +32,7 @@ on:
       - work/faultmate-p7-operator-file-flow-20261106
       - work/faultmate-p7-final-pr40-44-consolidation-cleanup-20261106
       - work/faultmate-p7-step2-ai-result-flow-lock-20261106
+      - work/faultmate-ml-retrospective-normal-evidence-20261106
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
