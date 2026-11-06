@@ -731,6 +731,25 @@
   const agentFeedback = document.getElementById('agent-feedback');
   agentResult = document.getElementById('agent-result');
   const agentNextStep = document.getElementById('agent-next-step');
+  // Only allowlisted local error codes are translated. Never echo provider
+  // response bodies, upstream exception text or the server's API key.
+  const safeAgentFailureReasons = Object.freeze({
+    provider_authentication_failed: 'DeepSeek 인증 거부(401): 서버에 키가 있어도 유효하지 않거나 권한이 없을 수 있어요. 기존 키의 유효성·API 권한을 별도 계정에서 확인하세요.',
+    provider_insufficient_balance: 'DeepSeek API 잔액 부족(402): 웹 구독과 API 결제는 별도예요. 계정의 API 사용 잔액을 확인하세요.',
+    provider_rate_limited: 'DeepSeek 요청 제한(429): 현재 서비스가 요청을 제한하고 있어요. 자동 재시도하지 않습니다.',
+    provider_request_rejected: 'DeepSeek가 요청을 거부했어요(400/422). 모델·요청 형식에 문제가 있을 수 있어요. 유료 재호출 전에 코드와 요청 조건을 검토해야 해요.',
+    provider_overloaded: 'DeepSeek 서버 과부하(503): 서비스가 처리하지 못했어요. 자동 재시도하지 않습니다.',
+    provider_server_error: 'DeepSeek 서버 오류(500): 서비스가 요청을 완료하지 못했어요. 자동 재시도하지 않습니다.',
+    provider_timeout: 'AI 응답 시간 초과: 전송됐는지와 요금 발생 여부를 확인할 수 없어요. 자동 재시도하지 않습니다.',
+    provider_network_error: '네트워크 연결 실패: 요청이 이미 전송됐을 가능성을 배제할 수 없어요. 자동 재시도하지 않습니다.',
+    provider_http_error: 'DeepSeek HTTP 오류: 응답 상태를 확인하지 못했어요. 반복 호출 전에 계정과 서비스 상태를 확인하세요.',
+    provider_transport_or_response_invalid: 'AI 연결 또는 응답 형식 검증에 실패했어요. 임의 지시나 불완전한 결과는 표시하지 않았습니다.',
+  });
+  function explainAgentFailure(errorCode) {
+    return typeof errorCode === 'string' && Object.prototype.hasOwnProperty.call(safeAgentFailureReasons, errorCode)
+      ? safeAgentFailureReasons[errorCode]
+      : 'AI 요청에 실패했지만 상세 오류를 안전하게 확인할 수 없어요. 자동 재시도하지 않습니다.';
+  }
   // This shortcut NEVER calls DeepSeek; it only reveals the existing controls
   // and the exact reason the paid button cannot yet be used.
   document.getElementById('ai-quick-start').addEventListener('click', () => {
@@ -773,6 +792,7 @@
   }
   function invalidateAgentReview() {
     if (!agentConsent || !agentRun) return;
+    const paidRequestAlreadyStarted = !!agentRequestController;
     ++agentPreviewVersion;
     lastPreviewVersion = -1;
     agentReviewedContextHash = null;
@@ -781,6 +801,11 @@
     agentPreviewContent.textContent = '';
     agentResult.replaceChildren();
     agentConsent.checked = false;
+    if (paidRequestAlreadyStarted) {
+      // AbortController only cancels this browser's wait. It CANNOT undo a
+      // previously transmitted paid request in the server's worker thread.
+      agentFeedback.textContent = '입력이 변경되어 이전 AI 결과 표시를 중단했어요. 이미 보낸 외부 요청은 계속 처리되거나 비용이 발생했을 수 있어요. 중복 요청하지 말고 사용 내역을 확인하세요.';
+    }
     syncAgentButton();
   }
   agentConsent.addEventListener('change', syncAgentButton);
@@ -838,6 +863,10 @@
       if (version !== agentPreviewVersion || triageHazard.value === 'yes' || controller.signal.aborted) return;
       agentResult.replaceChildren();
       add(agentResult,'p',result.message || 'AI 응답을 확인할 수 없습니다.','small-note');
+      if (result.status === 'error') {
+        add(agentResult, 'p', explainAgentFailure(result.error_code), 'agent-failure-reason');
+        add(agentResult, 'p', 'AI 요청이 전송됐을 수 있고 요금 발생 여부는 확인되지 않았어요. 자동 재요청하지 않습니다. 로컬 진단 결과는 그대로 사용하세요.', 'small-note');
+      }
       if (result.status === 'reviewed' && result.agent_review) {
         add(agentResult,'h4','AI 참고 검토 순서 · 원인 미확정');
         for (const c of result.agent_review.candidate_causes) {
