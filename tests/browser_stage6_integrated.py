@@ -166,7 +166,78 @@ async def run():
                 assert not await page.locator("#agent-consent").is_checked()
                 assert len(invocations) == 1
                 assert requests.count(("POST", "/api/agent/review")) == 2
+
+                # Provider auth, balance and throttling are DIFFERENT actionable
+                # conditions. Both the request and its failure are mocked.
+                # No provider body, secret, unsupported command or new paid
+                # request may ever be exposed or automatically retried.
+                for error_code, visible in (
+                    ("provider_authentication_failed", "인증 거부(401)"),
+                    ("provider_insufficient_balance", "잔액 부족(402)"),
+                    ("provider_rate_limited", "요청 제한(429)"),
+                    ("provider_timeout", "시간 초과"),
+                    ("provider_transport_or_response_invalid", "응답 형식 검증"),
+                ):
+                    def fail_with_allowlisted_code(_context, _key, code=error_code):
+                        raise agent._ProviderError(code)
+                    agent._invoke_deepseek = fail_with_allowlisted_code
+                    before_count = requests.count(("POST", "/api/agent/review"))
+                    await page.locator("#agent-preview").click()
+                    await page.locator("#agent-preview-content:not([hidden])").wait_for()
+                    await page.locator("#agent-consent").check()
+                    await page.locator("#agent-run").click()
+                    await page.wait_for_function(
+                        "(text) => document.querySelector('#agent-result').textContent.includes(text)",
+                        arg=visible)
+                    result_text = await page.locator("#agent-result").inner_text()
+                    assert "자동 재요청하지 않습니다" in result_text
+                    assert "PRIVATE_MOCK_PROVIDER_DIAGNOSTIC" not in result_text
+                    assert "SYNTHETIC_STAGE6_NO_NETWORK_KEY" not in result_text
+                    assert "전송 여부 확인 불가" in await page.locator("#agent-feedback").inner_text()
+                    assert requests.count(("POST", "/api/agent/review")) == before_count + 1
+                    assert await page.locator("#agent-run").is_disabled()
+
                 agent._invoke_deepseek = fake_invoke
+
+                # A response can reach the server/paid provider BEFORE the
+                # operator edits the form and aborts only their browser wait.
+                # Never erase that uncertainty or display a stale AI result.
+                delayed_started = asyncio.Event()
+                delayed_attempts = []
+                async def delayed_ai_reply(route):
+                    req = route.request
+                    delayed_attempts.append(req.post_data_buffer)
+                    response = client.post(
+                        "/api/agent/review", content=req.post_data_buffer or b"",
+                        headers={"content-type": "application/json"})
+                    assert response.status_code == 200
+                    assert response.json()["status"] == "reviewed"
+                    delayed_started.set()
+                    await asyncio.sleep(.5)
+                    try:
+                        await route.fulfill(status=response.status_code,
+                            body=response.content,
+                            headers={"content-type": "application/json"})
+                    except Exception:
+                        # The browser may cancel its pending fetch when the
+                        # user changes input. That cannot refund a sent request.
+                        pass
+                await page.route(BASE + "/api/agent/review", delayed_ai_reply)
+                await page.locator("#agent-preview").click()
+                await page.locator("#agent-preview-content:not([hidden])").wait_for()
+                await page.locator("#agent-consent").check()
+                await page.locator("#agent-run").click()
+                await asyncio.wait_for(delayed_started.wait(), timeout=7)
+                assert len(delayed_attempts) == 1
+                assert len(invocations) == 2
+                await page.locator("#triage-symptom").fill("STAGE6_USER_CHANGED_DURING_PAID_CALL")
+                assert "비용이 발생했을 수 있어요" in await page.locator("#agent-feedback").inner_text()
+                assert await page.locator("#agent-run").is_disabled()
+                assert not await page.locator("#agent-consent").is_checked()
+                await page.wait_for_timeout(650)
+                assert "AI 참고 검토 순서" not in await page.locator("#agent-result").inner_text()
+                assert len(delayed_attempts) == 1
+                await page.unroute(BASE + "/api/agent/review", delayed_ai_reply)
 
                 await page.locator("#ml-upload").set_input_files({
                     "name": "source.csv", "mimeType": "text/csv",
@@ -181,7 +252,7 @@ async def run():
                 assert await page.locator("#agent-run").is_disabled()
                 assert await page.locator("#agent-preview").is_disabled()
                 assert await page.locator("#ml-run").is_disabled()
-                assert len(invocations) == 1
+                assert len(invocations) == 2
                 assert not errors, errors
                 await browser.close()
     finally:

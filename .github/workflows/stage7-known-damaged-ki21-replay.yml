@@ -14,11 +14,13 @@ on:
       - work/faultmate-final-consolidated-review-20261106
       - work/faultmate-p7-operator-ai-flow-fix-20261106
       - work/faultmate-p7-existing-key-status-20261106
+      - work/faultmate-p7-ai-error-connection-20261106
   pull_request:
     branches:
       - main
       - work/faultmate-final-consolidated-review-20261106
       - work/faultmate-p7-operator-ai-flow-fix-20261106
+      - work/faultmate-p7-existing-key-status-20261106
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
