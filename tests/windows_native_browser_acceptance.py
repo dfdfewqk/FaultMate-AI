@@ -199,6 +199,7 @@ async def exercise_real_windows_chromium(base: str) -> dict:
                         "safe_to_work": False,
                         "previously_opened_damaged_test_replay_not_new_evaluation": True,
                         "historical_known_damaged_false_negative": True,
+                        "source_known_research_truth_label": "damaged",
                         "message": "시험 응답: 기존 손상 베어링 미탐입니다."
                     }),
                 )
