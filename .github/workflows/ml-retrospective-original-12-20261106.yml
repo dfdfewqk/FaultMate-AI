@@ -1,0 +1,99 @@
+name: FaultMate retrospective 12 previously opened bearings (no production ML)
+on:
+  push:
+    branches:
+      - work/faultmate-ml-retrospective-normal-evidence-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: faultmate-retrospective-12-original-reports
+  cancel-in-progress: false
+
+jobs:
+  retrospective-original-physical-bearings:
+    name: Pinned 12 original-bearing SHA evidence > retrospective healthy false alarms and damaged misses
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing offline machine-learning and test dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Regression on per-bearing grouping, source hashes and no runtime approval
+        run: |
+          python -m pytest -q tests/test_paderborn_retrospective_normal_lobo.py
+          python -m compileall -q scripts/evaluate_paderborn_retro_normal_lobo.py
+      - name: Retrieve the same exact 12 ORIGINAL-derived feature reports from verified 2026-11-05 run
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41965647928
+          github-token: ${{ github.token }}
+          pattern: stage4-unitless-bearing-*
+          path: feature-reports
+          merge-multiple: true
+      - name: Retrieve the corresponding 12 earlier original-MAT SHA and raw-signal audits
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41957475830
+          github-token: ${{ github.token }}
+          pattern: stage3-bearing-*
+          path: source-audits
+          merge-multiple: true
+      - name: Retrieve SHA256 pinned prior real 12-bearing study for independent source-blob verification
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41965647928
+          github-token: ${{ github.token }}
+          name: stage4-real-12-bearing-unitless-evaluation-unapproved
+          path: previous-report
+      - name: Fail closed unless EXACT previously verified original source records remain available
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          features=list(Path('feature-reports').glob('*.json'))
+          audits=list(Path('source-audits').glob('*.json'))
+          baseline=list(Path('previous-report').rglob('real_unitless_evaluation.json'))
+          assert len(features)==12, f'Expected 12 original feature JSON, got {len(features)}'
+          assert len(audits)==12, f'Expected 12 raw-MAT source JSON, got {len(audits)}'
+          assert len(baseline)==1, 'One exact original verified study required'
+          print('HISTORICAL_12_SOURCE_REPORTS_PRESENT_STILL_UNVERIFIED_UNTIL_SHA_CHECK')
+          PY
+      - name: Actually compute 12 physical-bearing retrospective LOBO, never field/independent approval
+        run: |
+          BASELINE="$(find previous-report -name real_unitless_evaluation.json -type f -print -quit)"
+          test -n "$BASELINE"
+          python scripts/evaluate_paderborn_retro_normal_lobo.py \
+            --features-dir feature-reports \
+            --audits-dir source-audits \
+            --previous-report "$BASELINE" \
+            --out "${{ runner.temp }}/retrospective_normal_12_opened.json"
+          python - <<'PY'
+          import json, os
+          from faultmate.integration.ml import load_validated_model
+          p=os.path.join(os.environ['RUNNER_TEMP'], 'retrospective_normal_12_opened.json')
+          d=json.load(open(p, encoding='utf-8'))
+          assert d['schema']=='faultmate_retrospective_opened_12_bearing_lobo_v1'
+          assert d['verified_original_unique_signal_count']==956
+          assert d['physical_healthy_bearing_count']==6
+          assert d['physical_damaged_bearing_count']==6
+          assert d['independent_new_bearings_tested']==0
+          assert d['new_prospective_healthy_specificity_measured'] is False
+          assert d['production_ml_activation_allowed'] is False
+          assert load_validated_model() is None
+          print('12_REAL_PREVIOUSLY_OPENED_BEARINGS_RETROSPECTIVE_ONLY_NO_FIELD_MODEL')
+          PY
+      - name: Store new retrospective JSON only (no original source signals or trained model)
+        uses: actions/upload-artifact@v4
+        with:
+          name: faultmate-paderborn-12-retrospective-opened-research-only
+          path: ${{ runner.temp }}/retrospective_normal_12_opened.json
+          if-no-files-found: error
+          retention-days: 7
