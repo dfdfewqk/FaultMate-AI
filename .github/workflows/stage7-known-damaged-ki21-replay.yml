@@ -6,12 +6,14 @@ on:
       - work/faultmate-stage7-dev-miss-warning-20261106
       - work/faultmate-stage7-ki21-feature-attribution-20261106
       - work/faultmate-stage7-ki21-condition-slices-20261106
+      - work/faultmate-stage7-ki21-current-scaler-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
       - work/faultmate-stage7-ki21-feature-attribution-20261106
+      - work/faultmate-stage7-ki21-condition-slices-20261106
 
 permissions:
   contents: read
@@ -404,6 +406,43 @@ jobs:
               Write-Output ("KI21_CONDITION_SHIFT condition={0} name={1} delta_logit={2:N6}" -f $row.condition, $feature.feature, [double]$feature.logit_contribution_change_vs_pooled)
             }
           }
+          $scaler = $r.current_scaler_diagnostic
+          $conditionGroups = @($scaler.condition_rows)
+          if ($scaler.pooled_input_reconstructed_exactly -ne $true -or
+              $scaler.original_mat_recordings -ne 80 -or
+              $scaler.source_unique_signal_pairs -ne 80 -or
+              $scaler.training_reference_scope -ne "10_previously_used_physical_bearing_pooled_medians" -or
+              $scaler.condition_record_distribution_not_equivalent_to_training_distribution -ne $true -or
+              $scaler.three_std_flag_is_descriptive_not_calibrated_outlier_threshold -ne $true -or
+              $scaler.model_feature_attribution_not_physical_sensor_diagnosis -ne $true -or
+              $scaler.new_independent_test -ne $false -or
+              $scaler.frozen_model_changed -ne $false -or
+              $scaler.frozen_threshold_changed -ne $false -or
+              $scaler.production_model_approved -ne $false -or
+              $scaler.safe_to_work -ne $false -or
+              $conditionGroups.Count -ne 4) {
+            throw "Current sensor scaler audit lacks provenance or safety gates"
+          }
+          foreach ($group in $conditionGroups) {
+            $matching = @($rows | Where-Object { $_.condition -eq $group.condition })
+            $features = @($group.features)
+            if ($matching.Count -ne 1 -or $group.original_mat_count -ne 20 -or
+                $group.unique_signal_pairs -ne $matching[0].unique_signal_pairs -or
+                $features.Count -ne 6 -or
+                [math]::Abs([double]$group.sum_current_logit_shift_vs_pooled -
+                  ([double]$matching[0].current_logit_contribution - [double]$r.pooled_current_logit_contribution)) -gt 0.00000001) {
+              throw "Current scaler logit shift disagrees with original condition audit"
+            }
+            foreach ($f in $features) {
+              if ($f.reference_is_training_bearing_level_median_scaler -ne $true -or
+                  $f.frozen_training_bearing_scaler_scale -le 0 -or
+                  $f.feature -notlike "current_*") {
+                throw "Incorrect current feature scaling reference"
+              }
+              Write-Output ("KI21_CURRENT_SCALER_DIAGNOSTIC condition={0} feature={1} median_z_vs_bearing_scaler={2:N4} iqr_in_scaler_units={3:N4} delta_logit_vs_pooled={4:N4} UNCALIBRATED" -f $group.condition, $f.feature, [double]$f.condition_median_z_vs_training_bearing_scaler, [double]$f.condition_iqr_in_training_scaler_units, [double]$f.logit_contribution_shift_vs_pooled)
+            }
+          }
+          Write-Output "KI21_CURRENT_TRAINING_SCALER_DESCRIPTIVE_ONLY_NOT_ANOMALY_OR_RUNTIME_APPROVAL"
           Write-Output "KI21_CONDITIONS_80_MAT_RECHECK_PASS_NOT_NEW_EVAL_NOT_VALIDATED_CONDITION_MODEL"
       - name: Original record safe and source/license untouched
         shell: pwsh
