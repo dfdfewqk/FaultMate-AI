@@ -89,8 +89,10 @@ def test_duplicate_excluded_and_pooled_input_verified():
     result = describe_current_scaler_dispersion(doc, model, pooled_unique)
     assert result["source_unique_signal_pairs"] == 79
     assert result["condition_rows"][0]["unique_signal_pairs"] == 19
+    intentionally_wrong = pooled_unique.copy()
+    intentionally_wrong[6] += 0.001
     with pytest.raises(ValueError, match="frozen_pooled_vector_changed"):
-        describe_current_scaler_dispersion(doc, model, pooled)
+        describe_current_scaler_dispersion(doc, model, intentionally_wrong)
 
 
 def test_invalid_scaler_source_nonfinite_and_duplicate_fail_closed():
