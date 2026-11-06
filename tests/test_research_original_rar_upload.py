@@ -5,6 +5,8 @@ is a separate official Zenodo K001 MD5 + full 80-MAT Windows CI job.
 """
 from __future__ import annotations
 
+import asyncio
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -201,3 +203,72 @@ def test_development_healthy_bearing_is_not_falsely_reported_as_damaged_miss(mon
     assert result["source_known_research_truth_label"] == "healthy"
     assert result["historical_known_damaged_false_negative"] is False
     assert result["safe_to_work"] is False
+
+
+def test_double_browser_cancel_keeps_original_rar_and_lock_until_worker_finishes(monkeypatch):
+    """SYNTHETIC worker only; real KI21/K001 MD5 replay remains separate CI.
+
+    Reproduces two ASGI cancellation requests while an already-started
+    extraction thread is reading the temporary original RAR. The archive
+    and single-flight semaphore MUST survive both cancels until completion.
+    """
+    monkeypatch.setattr(original, "MIN_ORIGINAL_RAR_BYTES", 12)
+    monkeypatch.setattr(original, "verify_rar_request",
+                        lambda _request: ("K001", None))
+    monkeypatch.setattr(
+        original.shutil, "disk_usage",
+        lambda _: SimpleNamespace(
+            free=original.MIN_EXTRA_DISK_BYTES +
+                 original.MAX_ORIGINAL_RAR_BYTES + 4096),
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    source_paths = []
+    payload = b"SYNTHETIC_FOR_DOUBLE_CANCEL_ONLY"
+
+    class SyntheticStream:
+        async def stream(self):
+            yield payload
+
+    def blocked_worker(archive: Path, bearing: str):
+        assert bearing == "K001"
+        assert archive.read_bytes() == payload
+        source_paths.append(archive)
+        entered.set()
+        if not release.wait(timeout=8):
+            raise AssertionError("synthetic_cancel_test_worker_never_released")
+        # On Windows cleanup/deletion before the worker exits would break
+        # the original extraction just like a large RAR archive in flight.
+        assert archive.is_file()
+        assert archive.read_bytes() == payload
+        return {"status": "experimental_unapproved",
+                "synthetic_worker_only": True, "safe_to_work": False}
+
+    monkeypatch.setattr(original, "_research_score", blocked_worker)
+
+    async def scenario():
+        task = asyncio.create_task(original.inspect_original_rar(SyntheticStream()))
+        assert await asyncio.to_thread(entered.wait, 4)
+        try:
+            task.cancel()
+            # Give the cancelled task a chance to enter the cleanup shield.
+            await asyncio.sleep(.02)
+            task.cancel()
+            await asyncio.sleep(.02)
+            assert not task.done(), (
+                "double cancellation released temp RAR before worker finished")
+            assert original._RESEARCH_BUSY.acquire(blocking=False) is False, (
+                "double cancellation released single-flight worker lock early")
+        finally:
+            release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=5)
+        assert len(source_paths) == 1
+        assert not source_paths[0].exists()
+        assert original._RESEARCH_BUSY.acquire(blocking=False) is True
+        original._RESEARCH_BUSY.release()
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        release.set()

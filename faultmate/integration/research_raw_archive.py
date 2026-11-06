@@ -151,6 +151,32 @@ def _research_score(archive: Path, asset: str) -> dict:
         ),
     }
 
+async def _drain_cancelled_research_worker(worker: asyncio.Task) -> None:
+    """Hold temporary RAR and single-flight lock until the extraction exits.
+
+    A browser can disconnect and cancel an ASGI task more than once. After
+    the first cancellation, later cancellations must not let TemporaryDirectory
+    delete the original RAR while the background 7z thread is still reading.
+    This helper neither cancels the worker nor retries or starts new work.
+    """
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            # A second disconnect/shutdown cancellation must not release
+            # the only source file or the semaphore while extraction runs.
+            continue
+        except Exception:
+            # Errors from the worker still mean it has finished; the original
+            # request remains cancelled rather than becoming a false result.
+            if not worker.done():
+                raise
+    if not worker.cancelled():
+        # Retrieve an eventual worker failure to avoid an unhandled exception
+        # warning, but never expose a path, model result or original signal.
+        worker.exception()
+
+
 async def inspect_original_rar(request: Request) -> dict:
     """HTTP-only local stream; no filename/absolute path supplied by user."""
     asset, declared = verify_rar_request(request)
@@ -188,7 +214,7 @@ async def inspect_original_rar(request: Request) -> dict:
                 try:
                     return await asyncio.shield(worker)
                 except asyncio.CancelledError:
-                    await asyncio.shield(worker)
+                    await _drain_cancelled_research_worker(worker)
                     raise
             except (OSError, ValueError, TypeError, KeyError, RuntimeError,
                     ImportError, ModuleNotFoundError):

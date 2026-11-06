@@ -7,7 +7,7 @@ if not exist ".venv\Scripts\python.exe" (
   call "%~dp0setup_windows.bat" --auto
   if errorlevel 1 goto failed
 )
-"%~dp0.venv\Scripts\python.exe" -c "import fastapi,uvicorn" >nul 2>&1
+"%~dp0.venv\Scripts\python.exe" -c "import fastapi,uvicorn,pydantic,numpy,scipy" >nul 2>&1
 if errorlevel 1 (
   echo [FaultMate] Python dependencies missing. Repairing environment...
   call "%~dp0setup_windows.bat" --auto
