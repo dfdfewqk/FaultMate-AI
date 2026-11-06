@@ -14,6 +14,10 @@ import json
 from pathlib import Path
 import re
 from collections import Counter
+import sys
+
+# Direct Windows/Linux CLI invocation must resolve the repository package root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 from scipy.io import loadmat
