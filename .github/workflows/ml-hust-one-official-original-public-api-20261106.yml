@@ -1,0 +1,45 @@
+name: FaultMate HUST official public API real original single file SHA
+on:
+  push:
+    branches:
+      - work/faultmate-ml-hust-official-public-api-original-one-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-original-real-one:
+    name: Publisher HUST v3 API index + N400.mat actual source SHA (no model activation)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing numpy scipy and pytest
+        run: python -m pip install -r requirements-ml.txt pytest
+      - name: Check official original source guards on synthetic data
+        run: |
+          python -m compileall -q scripts/verify_hust_official_public_original.py
+          python -m pytest -q tests/test_hust_official_public_original.py
+      - name: Actual official N400.mat source download and independent original SHA verification
+        run: |
+          python scripts/verify_hust_official_public_original.py > "$RUNNER_TEMP/hust_N400_actual_source_result.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          data=json.loads((Path(os.environ['RUNNER_TEMP'])/'hust_N400_actual_source_result.json').read_text())
+          assert data['dataset_id']=='cbv7jyx4p9' and data['dataset_version']==3
+          assert data['actual_original_file']=='N400.mat'
+          assert data['original_bytes_verified_to_first_party_sha256'] is True
+          assert data['original_bytes_verified_to_independent_locked_sha256'] is True
+          assert data['new_independent_normal_and_damaged_cohort_verified'] is False
+          assert data['production_model_activation_allowed'] is False
+          print('OFFICIAL_HUST_N400_REAL_SOURCE_SHA256_PASS',
+                data['file_bytes'], data['mat_numeric_sample_count'], data['original_sha256'])
+          print('ONLY_ONE_PUBLIC_RAW_FILE_DOWNLOADED_NO_MODEL_TRAINED')
+          PY
