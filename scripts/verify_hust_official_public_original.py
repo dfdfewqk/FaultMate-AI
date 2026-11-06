@@ -87,7 +87,7 @@ def published_files():
                 raise PublicSourceError("publisher_file_entry_invalid")
             filename, details = f.get("filename"), f.get("content_details")
             if (not isinstance(filename, str) or not re.fullmatch(
-                r"[A-Za-z0-9_-]{2,80}\\.(?:mat|png)", filename, flags=re.I)
+                r"[A-Za-z0-9_-]{2,80}\.(?:mat|png)", filename, flags=re.I)
                 or not isinstance(details, dict)):
                 raise PublicSourceError("publisher_original_name_or_metadata_invalid")
             digest, size, link = (details.get("sha256_hash"),
