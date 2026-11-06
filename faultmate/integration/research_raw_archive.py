@@ -109,7 +109,10 @@ def _research_score(archive: Path, asset: str) -> dict:
             json.loads(CATALOG.read_text(encoding="utf-8"))
         )}
         known_truth_label = catalog[asset]["label"]
-        missed_damage = False  # This was a development/earlier holdout asset.
+        # Previously used development/holdout examples can also be misclassified.
+        # Do not suppress a known physical-damage versus model-healthy conflict.
+        missed_damage = (known_truth_label == "damaged" and
+                         score["experimental_predicted_label"] == "healthy")
     return {
         "status": "experimental_unapproved",
         "research_inference_performed": True,
