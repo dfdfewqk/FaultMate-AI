@@ -683,7 +683,7 @@
     const agentConfigured = caps.agent?.configured === true;
     agentKeyConfigured = agentConfigured;
     const mlReady = caps.ml?.connected === true && caps.ml?.trained === true && caps.ml?.inference_enabled === true;
-    integrationAgent.textContent = agentReady ? '연결 확인됨' : (agentConfigured ? '키 설정됨 · 실제 연결 미확인' : 'API 키 없음');
+    integrationAgent.textContent = agentReady ? '연결 확인됨' : (agentConfigured ? 'API 키 감지됨 · 통신 미검증' : 'API 키 없음 · 로컬 진단만 가능');
     integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
     integrationTransfer.textContent = agentConfigured ? '요청별 명시 동의 후 가능' : 'API 키 미설정 · 전송 없음';
     integrationDetail.textContent = '로컬 연결 계약 ' + String(caps.contract_version || '미확인') + ' · 외부 AI는 매 요청 동의 필요. 실제 호출·모델 검증 상태를 과장하지 않습니다.';
@@ -733,7 +733,9 @@
       } else if (agentRequestController) {
         help = 'AI 요청 처리 중입니다. 응답이 없더라도 서버에 자료가 전달되었을 수 있습니다.';
       } else if (!previewValid) {
-        help = '② 아래 ‘AI 전송 예정 자료 확인’ 버튼을 누르면 외부로 보낼 정보가 표시됩니다. 아직 전송되지는 않습니다.';
+        help = agentKeyConfigured === false
+          ? '현재 DeepSeek API 키가 없습니다. 실제 유료 호출은 불가능합니다. ② 먼저 아래 ‘AI 전송 예정 자료 확인’으로 전송 내용만 로컬에서 확인할 수 있습니다.'
+          : '② 아래 ‘AI 전송 예정 자료 확인’ 버튼을 누르면 외부로 보낼 정보가 표시됩니다. 아직 전송되지는 않습니다.';
       } else if (!agentConsent.checked) {
         help = '③ 미리보기 내용을 확인했다면 바로 아래 동의 체크박스를 선택하세요. 체크만으로는 전송되지 않습니다.';
       } else if (agentKeyConfigured === false) {
