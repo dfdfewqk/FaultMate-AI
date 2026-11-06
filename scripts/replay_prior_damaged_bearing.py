@@ -31,7 +31,8 @@ from scripts.audit_paderborn_assets import OFFICIAL_CONDITIONS, SourceAuditError
 from scripts.evaluate_unseen_paderborn_damaged import frozen_coefficients
 from scripts.extract_paderborn_unitless import FEATURE_NAMES, SCHEMA
 from scripts.extract_unseen_paderborn_damaged import (
-    KNOWN_NEW_MD5, PINNED_MODEL_SHA, extract_unseen, verified_manifest,
+    KNOWN_NEW_MD5, MANIFEST, PINNED_MODEL_SHA,
+    canonical_json_sha256, extract_unseen, verified_manifest,
 )
 
 SHA256_RE = re.compile(r"[a-f0-9]{64}\Z")
@@ -55,6 +56,7 @@ def validate_prior_damaged_report(doc: dict) -> tuple[np.ndarray, dict]:
         or doc.get("evaluation_role") != "never_seen_damaged_only"
         or doc.get("status") != "real_original_unseen_damaged_features_unapproved"
         or doc.get("source_model_sha256") != PINNED_MODEL_SHA
+        or doc.get("source_manifest_sha256") != canonical_json_sha256(MANIFEST)
         or doc.get("label_source") != "Lessmeier et al. (2016), Table 5"
         or doc.get("label") != "damaged"
         or doc.get("damage_origin") != "accelerated_lifetime"
