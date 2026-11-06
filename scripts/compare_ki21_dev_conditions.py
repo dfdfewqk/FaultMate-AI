@@ -106,6 +106,17 @@ def compare_ki21_to_verified_development(
                              axis=0)
             for asset in sorted(DEV_ONLY)
         }
+        # Trial-to-trial dispersion uses each physical bearing only once
+        # in between-bearing summaries. 16-20 repeated source MAT records
+        # are NOT 16-20 independent physical bearings and DO NOT verify
+        # deterministic re-extraction from original archive bytes.
+        bearing_trial_iqr = {
+            asset: np.subtract(
+                *np.quantile(np.asarray(grouped[condition][asset], dtype=float),
+                             [.75, .25], axis=0)
+            )
+            for asset in sorted(DEV_ONLY)
+        }
         cond = ki21_by_condition[condition]
         ki21_values = cond.get("features")
         if (not isinstance(ki21_values, list)
@@ -132,6 +143,21 @@ def compare_ki21_to_verified_development(
             damaged = [float(bearing_medians[a][idx])
                        for a in sorted(DEV_DAMAGED)]
             all_dev = healthy + damaged
+            ki21_q25 = row.get("raw_unitless_q25")
+            ki21_q75 = row.get("raw_unitless_q75")
+            if (type(ki21_q25) not in (int, float)
+                or type(ki21_q75) not in (int, float)
+                or not math.isfinite(ki21_q25) or not math.isfinite(ki21_q75)
+                or ki21_q75 < ki21_q25):
+                raise ValueError("invalid_verified_ki21_trial_quantiles")
+            ki21_iqr = float(ki21_q75 - ki21_q25)
+            healthy_trial_iqr = [
+                float(bearing_trial_iqr[a][idx]) for a in sorted(DEV_HEALTHY)
+            ]
+            damaged_trial_iqr = [
+                float(bearing_trial_iqr[a][idx]) for a in sorted(DEV_DAMAGED)
+            ]
+            all_dev_trial_iqr = healthy_trial_iqr + damaged_trial_iqr
             features.append({
                 "feature": name,
                 "ki21_condition_median_unitless": float(observed),
@@ -150,6 +176,29 @@ def compare_ki21_to_verified_development(
                 "ki21_above_all_dev_observed_range": observed > max(all_dev),
                 "number_of_dev_bearings_with_lower_condition_median": sum(
                     value < observed for value in all_dev),
+                "within_bearing_trial_dispersion": {
+                    "meaning": "repeat_original_mat_features_within_one_physical_bearing",
+                    "ki21_original_trials": 20,
+                    "dev_bearings": 10,
+                    "ki21_trial_iqr_unitless": ki21_iqr,
+                    "ki21_trial_iqr_in_frozen_training_scale_units": float(
+                        ki21_iqr / scale[idx]),
+                    "healthy_dev_five_bearing_trial_iqr_median": float(
+                        np.median(healthy_trial_iqr)),
+                    "damaged_dev_five_bearing_trial_iqr_median": float(
+                        np.median(damaged_trial_iqr)),
+                    "dev_ten_bearing_trial_iqr_min": min(all_dev_trial_iqr),
+                    "dev_ten_bearing_trial_iqr_median": float(
+                        np.median(all_dev_trial_iqr)),
+                    "dev_ten_bearing_trial_iqr_max": max(all_dev_trial_iqr),
+                    "ki21_trial_iqr_below_all_ten_dev_bearing_iqr": (
+                        ki21_iqr < min(all_dev_trial_iqr)),
+                    "ki21_trial_iqr_above_all_ten_dev_bearing_iqr": (
+                        ki21_iqr > max(all_dev_trial_iqr)),
+                    "trials_not_independent_bearings": True,
+                    "not_an_independent_repeat_extraction_test": True,
+                    "not_a_calibrated_variance_or_sensor_stability_test": True,
+                },
                 "not_an_independent_accuracy_or_calibrated_outlier_test": True,
             })
         features.sort(key=lambda r: CURRENT_NAMES.index(r["feature"]))
