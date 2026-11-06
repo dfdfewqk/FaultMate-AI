@@ -199,6 +199,46 @@ async def run():
 
                 agent._invoke_deepseek = fake_invoke
 
+                # A response can reach the server/paid provider BEFORE the
+                # operator edits the form and aborts only their browser wait.
+                # Never erase that uncertainty or display a stale AI result.
+                delayed_started = asyncio.Event()
+                delayed_attempts = []
+                async def delayed_ai_reply(route):
+                    req = route.request
+                    delayed_attempts.append(req.post_data_buffer)
+                    response = client.post(
+                        "/api/agent/review", content=req.post_data_buffer or b"",
+                        headers={"content-type": "application/json"})
+                    assert response.status_code == 200
+                    assert response.json()["status"] == "reviewed"
+                    delayed_started.set()
+                    await asyncio.sleep(.5)
+                    try:
+                        await route.fulfill(status=response.status_code,
+                            body=response.content,
+                            headers={"content-type": "application/json"})
+                    except Exception:
+                        # The browser may cancel its pending fetch when the
+                        # user changes input. That cannot refund a sent request.
+                        pass
+                await page.route(BASE + "/api/agent/review", delayed_ai_reply)
+                await page.locator("#agent-preview").click()
+                await page.locator("#agent-preview-content:not([hidden])").wait_for()
+                await page.locator("#agent-consent").check()
+                await page.locator("#agent-run").click()
+                await asyncio.wait_for(delayed_started.wait(), timeout=7)
+                assert len(delayed_attempts) == 1
+                assert len(invocations) == 2
+                await page.locator("#triage-symptom").fill("STAGE6_USER_CHANGED_DURING_PAID_CALL")
+                assert "비용이 발생했을 수 있어요" in await page.locator("#agent-feedback").inner_text()
+                assert await page.locator("#agent-run").is_disabled()
+                assert not await page.locator("#agent-consent").is_checked()
+                await page.wait_for_timeout(650)
+                assert "AI 참고 검토 순서" not in await page.locator("#agent-result").inner_text()
+                assert len(delayed_attempts) == 1
+                await page.unroute(BASE + "/api/agent/review", delayed_ai_reply)
+
                 await page.locator("#ml-upload").set_input_files({
                     "name": "source.csv", "mimeType": "text/csv",
                     "buffer": (b"asset_id,trial_id,source_id,vibration_rms_m_s2,vibration_peak_m_s2,current_rms_a\n"
@@ -212,7 +252,7 @@ async def run():
                 assert await page.locator("#agent-run").is_disabled()
                 assert await page.locator("#agent-preview").is_disabled()
                 assert await page.locator("#ml-run").is_disabled()
-                assert len(invocations) == 1
+                assert len(invocations) == 2
                 assert not errors, errors
                 await browser.close()
     finally:
