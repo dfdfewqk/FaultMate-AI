@@ -9,6 +9,7 @@ on:
       - work/faultmate-stage7-ki21-current-scaler-20261106
       - work/faultmate-stage7-current-dev-reference-20261106
       - work/faultmate-stage7-dev-trial-spread-20261106
+      - work/faultmate-stage7-independent-test-gate-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
@@ -18,6 +19,7 @@ on:
       - work/faultmate-stage7-ki21-condition-slices-20261106
       - work/faultmate-stage7-ki21-current-scaler-20261106
       - work/faultmate-stage7-current-dev-reference-20261106
+      - work/faultmate-stage7-dev-trial-spread-20261106
 
 permissions:
   contents: read
@@ -45,6 +47,26 @@ jobs:
           python -m compileall -q faultmate scripts
           node --check web/app.js
           PYTHONPATH=. python tests/live_http_smoke.py
+      - name: Independent physical-bearing prospective readiness remains blocked (offline)
+        run: |
+          python scripts/audit_independent_bearing_preflight.py --out /tmp/faultmate_independent_bearing_plan_gate.json > /tmp/faultmate_independent_preflight_console.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/faultmate_independent_bearing_plan_gate.json',encoding='utf-8'))
+          assert d['status']=='NO_GO_NO_NEW_PROSPECTIVE_PHYSICAL_BEARING_COHORT'
+          assert d['original_frozen_model_verified'] is True
+          assert d['paderborn_all_six_healthy_previously_opened'] is True
+          assert d['existing_public_candidate_sources_reviewed']==4
+          assert d['new_independent_normal_bearings_verified']==0
+          assert d['new_independent_damaged_bearings_verified']==0
+          assert d['new_independent_specificity_or_accuracy_measured'] is False
+          assert d['production_ml_activation_allowed'] is False
+          assert d['model_retrained_or_scored'] is False
+          assert d['paid_api_called'] is False
+          assert d['draft_not_a_preregistered_study'] is True
+          assert all(len(x['reasons'])>0 for x in d['source_rejections'])
+          print('PROSPECTIVE_4_SOURCES_NO_NEW_HEALTHY_BEARINGS_RESEARCH_NO_GO_PASS')
+          PY
       - name: Offline final readiness report - local checks PASS but actual release BLOCKED
         run: |
           python scripts/preflight_final_acceptance.py --out /tmp/faultmate_stage7_readiness.json
