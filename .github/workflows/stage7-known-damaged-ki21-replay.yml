@@ -5,11 +5,13 @@ on:
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
       - work/faultmate-stage7-ki21-feature-attribution-20261106
+      - work/faultmate-stage7-ki21-condition-slices-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
+      - work/faultmate-stage7-ki21-feature-attribution-20261106
 
 permissions:
   contents: read
@@ -367,6 +369,42 @@ jobs:
           }
           Write-Output "ATTRIBUTION_IS_FROZEN_MODEL_ARITHMETIC_NOT_PHYSICAL_CAUSE_NOT_NEW_EVALUATION"
           Write-Output "REAL_KI21_ORIGINAL_80MAT_FROZEN_12_FEATURE_LOGIT_ATTRIBUTION_PASS_NO_NEW_TEST"
+      - name: Original KI21 four-condition pooled-median sensitivity (research only)
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
+          $report = Join-Path $env:RUNNER_TEMP "ki21_four_condition_diagnostic.json"
+          python -m scripts.audit_known_ki21_conditions --archive $archive > $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $report -Raw | ConvertFrom-Json
+          $rows = @($r.four_operating_conditions)
+          $verifiedTotal = ($rows | Measure-Object -Property original_mat_count -Sum).Sum
+          $uniqueTotal = ($rows | Measure-Object -Property unique_signal_pairs -Sum).Sum
+          if ($r.official_original_archive_md5_and_80_mat_verified_this_run -ne $true -or
+              $r.bearing_id -ne "KI21" -or $r.physical_research_truth -ne "damaged" -or
+              $r.source_mat_recordings -ne 80 -or $verifiedTotal -ne 80 -or
+              $rows.Count -ne 4 -or $uniqueTotal -ne $r.pooled_source_unique_signal_pairs -or
+              $r.original_80_record_pooled_median_reconstructed_exactly -ne $true -or
+              [math]::Abs([double]$r.frozen_pooled_score - 0.45992558) -gt 0.00000002 -or
+              $r.frozen_pooled_label -ne "healthy" -or
+              $r.condition_only_model_scores_outside_original_training_contract -ne $true -or
+              $r.previously_opened_ki21_not_new_independent_test -ne $true -or
+              $r.model_refitted_or_threshold_modified -ne $false -or
+              $r.production_model_approved -ne $false -or $r.safe_to_work -ne $false) {
+            throw "KI21 condition audit violates source, frozen input or scientific gates"
+          }
+          Write-Output ("KI21_FROZEN_POOLED score={0:N8} logit={1:N6} vibration={2:N6} current={3:N6}" -f [double]$r.frozen_pooled_score, [double]$r.frozen_pooled_logit, [double]$r.pooled_vibration_logit_contribution, [double]$r.pooled_current_logit_contribution)
+          foreach ($row in $rows) {
+            if ($row.not_a_validated_per_condition_prediction -ne $true -or
+                $row.original_mat_count -ne 20 -or $row.unique_signal_pairs -lt 1) {
+              throw "Condition-only score misrepresented as validated prediction"
+            }
+            Write-Output ("KI21_CONDITION_DIAGNOSTIC condition={0} unique={1} score={2:N8} logit={3:N6} vib={4:N6} cur={5:N6} change_vs_pooled={6:N6} UNVALIDATED_SUBGROUP" -f $row.condition, $row.unique_signal_pairs, [double]$row.diagnostic_condition_median_damage_score, [double]$row.diagnostic_condition_median_logit, [double]$row.vibration_logit_contribution, [double]$row.current_logit_contribution, [double]$row.logit_difference_from_frozen_pooled)
+            foreach ($feature in @($row.largest_three_feature_contribution_differences)) {
+              Write-Output ("KI21_CONDITION_SHIFT condition={0} name={1} delta_logit={2:N6}" -f $row.condition, $feature.feature, [double]$feature.logit_contribution_change_vs_pooled)
+            }
+          }
+          Write-Output "KI21_CONDITIONS_80_MAT_RECHECK_PASS_NOT_NEW_EVAL_NOT_VALIDATED_CONDITION_MODEL"
       - name: Original record safe and source/license untouched
         shell: pwsh
         run: |
