@@ -699,7 +699,7 @@
       integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
       integrationTransfer.textContent = agentConfigured ? '미전송 · 요청별 동의 시에만 가능' : 'API 키 미설정 · 전송 없음';
       integrationDetail.textContent = '로컬 설정 확인 완료 · DeepSeek 유료 API는 호출하지 않았습니다. 모델과 통신 상태는 별도입니다.';
-      document.getElementById('agent-status').textContent = agentConfigured ? '키 감지됨' : '키 없음';
+      document.getElementById('agent-status').textContent = agentConfigured ? '설정됨' : '미연결';
       agentKeyFeedback.textContent = agentConfigured
         ? '기존 키가 서버에서 감지됐어요. 다시 발급하거나 입력할 필요가 없습니다. DeepSeek 실제 연결 성공은 아직 미검증이고 이 확인으로 비용은 발생하지 않습니다.'
         : '현재 실행 중인 서버에서 키를 찾지 못했어요. 이전에 키가 있었다면 프로그램을 실행한 Windows 계정·환경변수 DEEPSEEK_API_KEY를 확인한 후 서버를 다시 시작하세요. 이 화면에 키를 입력하지 마세요.';
