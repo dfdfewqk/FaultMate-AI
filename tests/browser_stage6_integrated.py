@@ -71,6 +71,24 @@ async def run():
                 await page.add_style_tag(content=(root / "web/style.css").read_text(encoding="utf-8"))
                 await page.add_script_tag(content=(root / "web/app.js").read_text(encoding="utf-8"))
                 await page.wait_for_function("document.querySelector('#triage-feedback').textContent.includes('설비와 사례')")
+                # Existing key: the UI only refreshes localhost metadata,
+                # WITHOUT sending an AI request, reading/printing credentials
+                # or mistaking configured=true for a live provider success.
+                await page.wait_for_function(
+                    "document.querySelector('#agent-key-feedback').textContent.includes('기존 키가 서버에서 감지')")
+                before_checks = requests.count(("GET", "/api/integration/capabilities"))
+                await page.locator("#ai-quick-start").click()
+                await page.locator("#agent-key-refresh").click()
+                await page.wait_for_function(
+                    "document.querySelector('#agent-key-refresh').disabled === false && "
+                    "document.querySelector('#agent-key-feedback').textContent.includes('기존 키가 서버에서 감지')")
+                assert requests.count(("GET", "/api/integration/capabilities")) >= before_checks + 1
+                assert requests.count(("POST", "/api/agent/review")) == 0
+                assert "SYNTHETIC_STAGE6_NO_NETWORK_KEY" not in await page.locator("#agent-key-feedback").inner_text()
+                assert "다시 발급하거나 입력할 필요가 없습니다" in await page.locator("#agent-key-feedback").inner_text()
+                assert "외부 연결 미검증" in await page.locator("#integration-agent").inner_text()
+                assert len(invocations) == 0
+                await page.locator("#integration-panel > summary").click()
 
                 # Reproduce actual operator frustration: demo-mode AI may
                 # appear locked, but must explain why and NEVER charge.
