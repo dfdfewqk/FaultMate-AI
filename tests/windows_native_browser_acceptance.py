@@ -177,6 +177,54 @@ async def exercise_real_windows_chromium(base: str) -> dict:
                 "document.querySelector('#raw-rar-feedback').textContent.includes('100MB')")
             assert not (await page.locator("#raw-rar-result").inner_text()).strip()
 
+            # SYNTHETIC BROWSER PRESENTATION TEST ONLY: intercept ONE response
+            # to verify the UI cannot silently call a physically damaged
+            # KI21 "healthy" prediction safe. This is NOT a second real test;
+            # a dedicated separate source-MD5/80-MAT CI job handles real KI21.
+            async def known_miss_ui_fixture(route):
+                assert route.request.method == "POST"
+                await route.fulfill(
+                    status=200, content_type="application/json",
+                    body=json.dumps({
+                        "status": "experimental_unapproved",
+                        "research_inference_performed": True,
+                        "original_rar_md5_verified_in_this_request": True,
+                        "source_mat_files_actually_read_this_run": 80,
+                        "bearing_id": "KI21",
+                        "experimental_predicted_label": "healthy",
+                        "experimental_damage_model_score": 0.17,
+                        "source_unique_signal_pairs": 80,
+                        "model_approved_for_runtime": False,
+                        "confirmed_fault": False,
+                        "safe_to_work": False,
+                        "previously_opened_damaged_test_replay_not_new_evaluation": True,
+                        "historical_known_damaged_false_negative": True,
+                        "message": "시험 응답: 기존 손상 베어링 미탐입니다."
+                    }),
+                )
+
+            await page.route("**/api/ml/experimental-original-rar", known_miss_ui_fixture)
+            await page.locator("#raw-rar-upload").set_input_files({
+                "name": "KI21.rar", "mimeType": "application/octet-stream",
+                "buffer": b"SYNTHETIC_UI_RESPONSE_NOT_A_REAL_RAR",
+            })
+            # The browser normally requires >=100MB. For this limited
+            # response-rendering test, use a synthetic File size getter
+            # rather than allocating/uploading 100MB of pretend sensor data.
+            await page.evaluate("""() => {
+              const file = document.getElementById('raw-rar-upload').files[0];
+              Object.defineProperty(file, 'size', {value: 100000000});
+            }""")
+            await page.locator("#raw-rar-run").click()
+            await page.wait_for_function(
+                "document.querySelector('#raw-rar-result').textContent.includes('미탐')")
+            missed_html_text = await page.locator("#raw-rar-result").inner_text()
+            assert "실측 연구 원본 정답: 손상" in missed_html_text
+            assert "실제 손상 베어링을 모델이 정상 쪽으로 잘못 예측" in missed_html_text
+            assert "운전·작업 안전을 판단하면 안 됩니다" in missed_html_text
+            assert "새 독립 검증이 아닙니다" in missed_html_text
+            await page.unroute("**/api/ml/experimental-original-rar", known_miss_ui_fixture)
+
             # Safety-hold must hide stale results and disable both optional AI/ML.
             await page.locator("#triage-hazard").select_option("yes")
             assert await page.locator("#agent-preview").is_disabled()
