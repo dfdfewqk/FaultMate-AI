@@ -1,0 +1,92 @@
+name: FaultMate original K001 RAR companion PDFs SI provenance review
+on:
+  push:
+    branches:
+      - work/faultmate-ml-paderborn-original-companion-calibration-scan-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-original-k001-companion-pdfs:
+    name: Official MD5 K001 RAR -> accompanying PDFs -> lexical SI reference audit only
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only PDF page parser and synthetic test runner
+        shell: pwsh
+        run: |
+          python -m pip install "pypdf>=5,<7" pytest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest -q tests/test_paderborn_original_companion_pdfs.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m compileall -q scripts/audit_paderborn_original_companion_pdfs.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download one known Paderborn K001 original RAR into ephemeral Windows runner only
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          & curl.exe --fail --location --retry 1 --connect-timeout 25 --max-time 650 --silent --show-error "https://zenodo.org/records/15845309/files/K001.rar?download=1" --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $size = (Get-Item $archive).Length
+          if ($size -lt 100000000) { throw "K001 archive too short" }
+          $actual = (Get-FileHash $archive -Algorithm MD5).Hash.ToLowerInvariant()
+          if ($actual -ne "af6dc58283d356cd438e7738a2d525b8") { throw "Publisher-pinned original K001 RAR MD5 mismatch" }
+          Write-Output "ORIGINAL_K001_RAR_OFFICIAL_MD5_PASS"
+      - name: Extract only original companion PDF files (never source MAT); never upload PDFs
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          $docdir = Join-Path $env:RUNNER_TEMP "original_pdf_sidecars"
+          New-Item -Force -ItemType Directory $docdir | Out-Null
+          $seven = Join-Path $env:ProgramFiles "7-Zip\7z.exe"
+          if (-not (Test-Path $seven)) {
+            $command = Get-Command "7z.exe" -ErrorAction SilentlyContinue
+            if ($null -eq $command) { throw "7Zip executable missing in ephemeral Windows test runner" }
+            $seven = $command.Source
+          }
+          & $seven e $archive "-o$docdir" -y "-ir!*.pdf" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Source RAR companion-PDF extract failed" }
+          $pdfCount = @(Get-ChildItem -Path $docdir -Filter "*.pdf" -File).Count
+          if ($pdfCount -lt 1 -or $pdfCount -gt 8) { throw "Expected 1-8 original sidecar PDFs, got $pdfCount" }
+          Write-Output "ORIGINAL_SOURCE_K001_COMPANION_PDFS_EXTRACTED_COUNT=$pdfCount"
+      - name: Scan text-visible references to MATLAB stored-unit and calibration only
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          $docdir = Join-Path $env:RUNNER_TEMP "original_pdf_sidecars"
+          $out = Join-Path $env:RUNNER_TEMP "k001_companion_pdf_unit_lexical_review.json"
+          python scripts/audit_paderborn_original_companion_pdfs.py --original-archive $archive --companion-pdfs $docdir --out $out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $out -Raw | ConvertFrom-Json
+          if ($r.original_rar_md5_matched_pinned_publisher -ne $true -or
+              $r.number_of_companion_pdf_files_inspected -lt 1 -or
+              $r.human_approved_document_specific_si_calibration -ne $false -or
+              $r.original_stored_vibration_Y_Data_to_SI_scale_verified -ne $false -or
+              $r.original_stored_phase_current_Y_Data_to_SI_scale_verified -ne $false -or
+              $r.training_or_field_model_activation_allowed -ne $false) {
+            throw "Original companion PDF evidence status invented calibration or overlooked source MD5"
+          }
+          foreach ($row in $r.companion_pdf_metadata_and_lexical_pages) {
+            Write-Output ("ORIGINAL_COMPANION_PDF name={0} pages={1} textPages={2} channelRefPages={3} genericCalibrationPages={4} unitWordPages={5}" -f
+              $row.original_rar_companion_file_basename, $row.pages_total,
+              $row.pdf_pages_with_extractable_text,
+              ($row.pages_with_machine_matlab_signal_name_mentions -join ","),
+              ($row.pages_with_generic_calibration_terms -join ","),
+              ($row.pages_with_physical_unit_words -join ","))
+          }
+          Write-Output "ORIGINAL_PDF_LEXICAL_AUDIT_NOT_NUMERIC_Y_DATA_SI_CALIBRATION"
+      - name: Keep ONLY document hashes and page-word indexes for 7 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: paderborn-k001-original-companion-pdfs-unit-lexical-evidence-only
+          path: ${{ runner.temp }}/k001_companion_pdf_unit_lexical_review.json
+          retention-days: 7
+          if-no-files-found: error
