@@ -19,9 +19,6 @@ import sys
 # Direct Windows/Linux CLI invocation must resolve the repository package root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-from scipy.io import loadmat
-
 from scripts.verify_hust_official_public_original import (
     DATASET, VERSION, _get_url, published_files, MAX_SIGNAL, PublicSourceError,
 )
@@ -62,6 +59,11 @@ def verify_shard(shard: int, shard_count: int, downloader=_get_url):
         raise PublicSourceError("invalid_original_audit_shard")
     entries, index_sha = official_mat_index()
     subset = [x for i, x in enumerate(entries) if i % shard_count == shard]
+    # Summary jobs are stdlib-only; original signal parsing needs SciPy only
+    # on the actual SHA-verification shards, not during report aggregation.
+    import numpy as np
+    from scipy.io import loadmat
+
     records = []
     for entry in subset:
         raw = downloader(entry["download_url"], MAX_SIGNAL)
