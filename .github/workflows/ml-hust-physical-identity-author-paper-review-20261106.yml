@@ -1,0 +1,63 @@
+name: FaultMate HUST physical specimen identity and original source conflict (no trained ML)
+on:
+  push:
+    branches:
+      - work/faultmate-ml-hust-physical-id-paper-reconcile-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  source-to-paper-physical-identity:
+    name: Actual publisher 99-MAT SHA manifest vs paper 3 healthy and 27 damaged prototypes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Small source-only grouping regression (synthetic metadata, no claims)
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tests/test_reconcile_hust_original_physical_identity.py
+          python -m compileall -q scripts/reconcile_hust_original_physical_identity.py
+      - name: Retrieve SHA-verified real 99 source files' JSON report from audited original run (NOT source MAT files)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 42186836277
+          github-token: ${{ github.token }}
+          name: hust-v3-real-99-original-source-sha-only-review
+          path: original-99-sha
+      - name: Verify exact earlier publisher source report SHA and reconcile 99 names with article 3/27 specimen counts
+        run: |
+          python scripts/reconcile_hust_original_physical_identity.py \
+            --official-source-report original-99-sha/hust_real_99_official_sha_report.json \
+            --out "${{ runner.temp }}/hust_physical_identity_unresolved.json"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          data=json.loads((Path(os.environ['RUNNER_TEMP'])/'hust_physical_identity_unresolved.json').read_text())
+          assert data['actual_source_sha_verified_original_mat_recordings']==99
+          assert data['observed_normal_filename_codes']==5
+          assert data['observed_damaged_filename_codes']==28
+          assert data['author_paper_reported_healthy_physical_prototypes']==3
+          assert data['author_paper_reported_damaged_physical_prototypes']==27
+          assert data['verified_physical_healthy_specimen_count']==0
+          assert data['verified_physical_damaged_specimen_count']==0
+          assert data['new_independent_normal_evaluation_permitted'] is False
+          assert data['production_ml_activation_allowed'] is False
+          print('ACTUAL_99_SHA_VERIFIED_SOURCE_NAMES_5_HEALTHY_CODES_28_FAULT_CODES')
+          print('AUTHOR_PHYSICAL_3_HEALTHY_27_DAMAGED_UNCONFIRMED_PER_FILE_SOURCE_NO_GO')
+          PY
+      - name: Save only the code-group-to-file review, not originals or ML weights
+        uses: actions/upload-artifact@v4
+        with:
+          name: hust-99-v3-paper-vs-filename-physical-specimen-blocked
+          path: ${{ runner.temp }}/hust_physical_identity_unresolved.json
+          retention-days: 7
+          if-no-files-found: error
