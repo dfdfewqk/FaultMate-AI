@@ -188,7 +188,7 @@ async def run():
                     await page.locator("#agent-run").click()
                     await page.wait_for_function(
                         "(text) => document.querySelector('#agent-result').textContent.includes(text)",
-                        visible)
+                        arg=visible)
                     result_text = await page.locator("#agent-result").inner_text()
                     assert "자동 재요청하지 않습니다" in result_text
                     assert "PRIVATE_MOCK_PROVIDER_DIAGNOSTIC" not in result_text
