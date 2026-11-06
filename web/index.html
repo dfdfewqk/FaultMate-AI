@@ -85,7 +85,7 @@
         <p class="small-note"><b>현재 일반 CSV용 승인 ML 모델이 없어 예측 결과는 나오지 않습니다.</b> 이 칸에서는 입력 CSV 형식만 검증할 수 있습니다. 실제 연구용 점수 테스트는 바로 아래 ‘원본 RAR 자동 분석’에 K001.rar를 넣으세요. 데이터는 로컬 서버에서만 처리합니다.</p>
         <label for="ml-upload">측정 특성 CSV</label>
         <input type="file" id="ml-upload" accept=".csv,text/csv"/>
-        <div class="form-actions"><button type="button" id="ml-run">CSV 검증·ML 실행</button></div>
+        <div class="form-actions"><button type="button" id="ml-run" disabled>CSV 형식 검사 (ML 예측 불가)</button></div>
         <p id="ml-feedback" class="small-note" role="status"></p>
         <article id="ml-result" class="triage-result" aria-live="polite"></article>
       </div>
