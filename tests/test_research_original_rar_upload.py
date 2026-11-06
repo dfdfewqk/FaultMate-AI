@@ -66,11 +66,11 @@ def test_small_or_missing_original_input_does_not_trigger_model(monkeypatch):
                         lambda *_: pytest.fail("too-small RAR must never score"))
     assert _request(b"tiny").status_code == 422
     assert _request(b"").status_code in (400, 422)
-    assert _request(b"tiny", bearing="KA15").status_code == 422
+    assert _request(b"tiny", bearing="KI22").status_code == 422
     assert _request(b"tiny", bearing="../K001").status_code == 422
 
 
-@pytest.mark.parametrize("bearing", ["", "K777", "KA15", "../../K001", "KI99999", "K001.rar", "k001"])
+@pytest.mark.parametrize("bearing", ["", "K777", "KI22", "../../K001", "KI99999", "K001.rar", "k001"])
 def test_original_bearing_warehouse_allowlist_checked_before_stream(monkeypatch,
                                                                      bearing):
     monkeypatch.setattr(original, "_research_score",

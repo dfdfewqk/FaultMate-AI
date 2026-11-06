@@ -1020,8 +1020,25 @@
         add(rawRarResult,'p',
           '원본 MD5 확인 · 실제 MATLAB 측정 80회 · 중복 제외 후 ' +
           result.source_unique_signal_pairs + '개', 'small-note');
+        if (result.previously_opened_damaged_test_replay_not_new_evaluation === true) {
+          add(rawRarResult,'p',
+            '실측 연구 원본 정답: 손상. 이 베어링은 과거 8개 손상 평가에 이미 사용했습니다. ' +
+            '이번 실행은 이미 알려진 자료를 다시 계산한 것이지 새 독립 검증이 아닙니다.',
+            'small-note');
+          if (result.historical_known_damaged_false_negative === true &&
+              result.experimental_predicted_label === 'healthy') {
+            add(rawRarResult,'p',
+              '주의 — 실제 손상 베어링을 모델이 정상 쪽으로 잘못 예측한 미탐입니다. ' +
+              '정상 표시만 보고 운전·작업 안전을 판단하면 안 됩니다.', 'result-hold');
+          }
+        } else {
+          add(rawRarResult,'p',
+            '기존 학습 또는 이전 시험에 이미 사용한 베어링입니다. ' +
+            '학습 데이터 결과를 새로운 정확도 검증으로 취급하지 않습니다.',
+            'small-note');
+        }
         add(rawRarResult,'p',
-          '이 베어링은 기존 학습에 사용되었을 수 있습니다. 독립 정상 베어링 오경보율·현장 정확도 미검증. ' +
+          '정식 승인되지 않은 연구 모델. 독립 정상 베어링 오경보율·현장 정확도 미검증. ' +
           '실제 설비 고장 확정·고장 확률·작업 허가 아님.', 'result-hold');
       }
     } catch (_e) {
