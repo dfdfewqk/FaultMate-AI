@@ -161,3 +161,43 @@ def test_archive_request_does_not_activate_legacy_si_csv_product_ml():
     assert r["ml"]["inference_enabled"] is False
     from faultmate.integration.ml import load_validated_model
     assert load_validated_model() is None
+
+
+def test_development_damaged_bearing_miss_is_not_suppressed(monkeypatch):
+    """SYNTHETIC score only; test warning flag, never scientific performance."""
+    import scripts.run_experimental_paderborn_ml as runner
+    monkeypatch.setattr(original.shutil, "which", lambda _: "/synthetic/7z")
+    monkeypatch.setattr(runner, "run_archive", lambda *_args, **_kwargs: {
+        "research_input_source": {
+            "source_records": 80, "unique_signal_pairs": 80,
+            "duplicates_excluded": 0,
+        },
+        "frozen_model_sha256": "f" * 64,
+        "experimental_predicted_label": "healthy",
+        "experimental_damage_model_score": 0.25,
+    })
+    result = original._research_score(Path("/synthetic/KA04.rar"), "KA04")
+    assert result["source_known_research_truth_label"] == "damaged"
+    assert result["historical_known_damaged_false_negative"] is True
+    assert result["safe_to_work"] is False
+    assert result["model_approved_for_runtime"] is False
+    assert "놓친 미탐" in result["message"]
+
+
+def test_development_healthy_bearing_is_not_falsely_reported_as_damaged_miss(monkeypatch):
+    """SYNTHETIC score only; source truth stays separate from prediction."""
+    import scripts.run_experimental_paderborn_ml as runner
+    monkeypatch.setattr(original.shutil, "which", lambda _: "/synthetic/7z")
+    monkeypatch.setattr(runner, "run_archive", lambda *_args, **_kwargs: {
+        "research_input_source": {
+            "source_records": 80, "unique_signal_pairs": 80,
+            "duplicates_excluded": 0,
+        },
+        "frozen_model_sha256": "f" * 64,
+        "experimental_predicted_label": "healthy",
+        "experimental_damage_model_score": 0.25,
+    })
+    result = original._research_score(Path("/synthetic/K001.rar"), "K001")
+    assert result["source_known_research_truth_label"] == "healthy"
+    assert result["historical_known_damaged_false_negative"] is False
+    assert result["safe_to_work"] is False
