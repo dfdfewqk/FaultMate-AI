@@ -11,6 +11,7 @@ on:
       - work/faultmate-stage7-dev-trial-spread-20261106
       - work/faultmate-stage7-independent-test-gate-20261106
       - work/faultmate-stage7-final-integration-cancel-safety-20261106
+      - work/faultmate-final-consolidated-review-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
