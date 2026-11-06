@@ -19,9 +19,13 @@ def fake_original(tmp_path, monkeypatch):
     def stat_with_test_size(self, **kwargs):
         result = original_size(self, **kwargs)
         if self == archive:
-            class SyntheticOriginal:
-                st_size = 166_000_000
-            return SyntheticOriginal()
+            # Preserve the full os.stat_result contract on Windows and Linux.
+            # Only st_size is synthetic; other stat fields must still work
+            # for pathlib.is_file() / pathlib.is_symlink().
+            import os
+            data = list(result)
+            data[6] = 166_000_000
+            return os.stat_result(data)
         return result
     monkeypatch.setattr(Path, "stat", stat_with_test_size)
     return archive
