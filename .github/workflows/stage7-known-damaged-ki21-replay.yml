@@ -351,6 +351,21 @@ jobs:
               $r.safe_to_work -ne $false) {
             throw "Actual KI21 attribution mismatched frozen source/model contract"
           }
+          # Print only the frozen model's signed logit terms (not original
+          # waveforms, full feature vectors, new performance or causal claims).
+          # Individual contributions must sum with the intercept to the logit.
+          $terms = @($r.features_sorted_by_absolute_logit_contribution)
+          $sumTerms = ($terms | Measure-Object -Property signed_logit_contribution -Sum).Sum
+          $reconstructed = [double]$r.intercept + [double]$sumTerms
+          if ([math]::Abs($reconstructed - [double]$r.logit) -gt 0.00000001 -or
+              [math]::Abs([double]$r.damage_model_score - 0.45992558) -gt 0.00000002) {
+            throw "KI21 signed attribution terms do not explain the historical frozen prediction"
+          }
+          Write-Output ("KI21_FROZEN_ATTRIBUTION_INTERCEPT={0:N6} LOGIT={1:N6} SCORE={2:N8}" -f [double]$r.intercept, [double]$r.logit, [double]$r.damage_model_score)
+          foreach ($term in $terms) {
+            Write-Output ("KI21_FROZEN_FEATURE_CONTRIBUTION name={0} signed_logit={1:N6}" -f [string]$term.feature, [double]$term.signed_logit_contribution)
+          }
+          Write-Output "ATTRIBUTION_IS_FROZEN_MODEL_ARITHMETIC_NOT_PHYSICAL_CAUSE_NOT_NEW_EVALUATION"
           Write-Output "REAL_KI21_ORIGINAL_80MAT_FROZEN_12_FEATURE_LOGIT_ATTRIBUTION_PASS_NO_NEW_TEST"
       - name: Original record safe and source/license untouched
         shell: pwsh
