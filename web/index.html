@@ -67,6 +67,10 @@
         <p class="small-note">AI는 기존 원인 후보의 <b>검토 순서와 추가 질문</b>만 정리합니다. 새로운 고장을 확정하거나 실측 데이터를 학습하지 않습니다.</p>
         <p class="small-note">① 실제 사례 선택 → ② 전송 예정 자료 확인 → ③ 명시적 동의 → ④ AI 검토 실행. 가상 예시·긴급 위험에는 외부 AI를 호출할 수 없습니다.</p>
         <p id="agent-next-step" class="agent-next-step" role="status" aria-live="polite">AI 사용 조건 확인 중...</p>
+        <div class="agent-key-check" aria-label="서버에 이미 설정된 AI 키 인식 확인">
+          <div><b>기존 DeepSeek API 키 인식</b><p id="agent-key-feedback" role="status" aria-live="polite">로컬 서버의 키 설정 여부를 확인 중입니다. 키 원문은 읽거나 표시하지 않습니다.</p></div>
+          <button id="agent-key-refresh" type="button" class="secondary-button">기존 키 인식 다시 확인</button>
+        </div>
         <details id="agent-key-setup" class="optional-fields"><summary>API 키 표시가 안 눌리나요? 키 설정 방법</summary><p class="small-note">‘키 설정됨 / API 키 없음’은 상태 표시이지 입력 버튼이 아닙니다. DeepSeek는 ChatGPT 구독과 별도 서비스예요. 사용할 경우 Windows의 서버 실행 환경변수 <code>DEEPSEEK_API_KEY</code>에 본인 키를 설정하고 프로그램을 완전히 다시 실행해야 합니다. 키를 웹 화면에 붙여 넣거나 채팅에 공유하지 마세요. 실제 외부 요청에는 요금이 발생할 수 있습니다.</p></details>
         <p class="small-note">선택된 사례·관찰과 공개 근거만 전송합니다. 입력한 원문 증상·알람·모델명은 전송하지 않습니다. 전송 전 내용을 확인하고 매 요청마다 동의해야 합니다.</p>
         <div class="form-actions"><button type="button" class="secondary-button" id="agent-preview">AI 전송 예정 자료 확인</button></div>

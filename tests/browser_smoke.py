@@ -64,6 +64,20 @@ async def run():
         assert await page.locator('#knowledge-panel').evaluate('(el) => !el.open')
         assert await page.locator('#triage-more').evaluate('(el) => !el.open')
         counts["ui_checks"] += 3
+        # The absence of a key is distinct from a failed local-server lookup.
+        # A manual status refresh must never send a paid request or ask for
+        # credential text in a browser field.
+        await page.locator("#ai-quick-start").click()
+        assert "키를 찾지 못했어요" in await page.locator("#agent-key-feedback").inner_text()
+        assert await page.locator("#agent-key-refresh").is_enabled()
+        await page.locator("#agent-key-refresh").click()
+        await page.wait_for_function(
+            "document.querySelector('#agent-key-refresh').disabled === false")
+        assert "키를 찾지 못했어요" in await page.locator("#agent-key-feedback").inner_text()
+        assert "API 키" in await page.locator("#agent-key-setup").inner_text()
+        assert await page.locator("#agent-run").is_disabled()
+        await page.locator("#integration-panel > summary").click()
+        assert await page.locator("#integration-panel").evaluate("(el) => !el.open")
         await page.screenshot(path='/mnt/data/FaultMate_AI_Simple_Initial.png',full_page=True)
 
         await page.locator("#triage-equipment").select_option("컨베이어")

@@ -674,31 +674,54 @@
   const integrationMl = document.getElementById('integration-ml');
   const integrationTransfer = document.getElementById('integration-transfer');
   const integrationDetail = document.getElementById('integration-detail');
-  // The optional capabilities request may be slow; never block core diagnostic
-  // controls or registration of the AI/ML event listeners while checking it.
-  void (async () => {
+  // Only inspect the existing localhost capabilities endpoint. This does
+  // NOT inspect the key value, open a provider socket, or create paid traffic.
+  // Older successful responses must not overwrite a newer manual refresh.
+  const agentKeyFeedback = document.getElementById('agent-key-feedback');
+  const agentKeyRefresh = document.getElementById('agent-key-refresh');
+  let keyRefreshVersion = 0;
+  async function refreshLocalKeyPresence() {
+    const version = ++keyRefreshVersion;
+    agentKeyRefresh.disabled = true;
+    agentKeyFeedback.textContent = '기존 키의 설정 여부를 로컬 서버에서 확인 중... (외부 AI 호출 없음)';
     try {
-    const caps = await request('/api/integration/capabilities');
-    const agentReady = caps.agent?.connected === true;
-    const agentConfigured = caps.agent?.configured === true;
-    agentKeyConfigured = agentConfigured;
-    const mlReady = caps.ml?.connected === true && caps.ml?.trained === true && caps.ml?.inference_enabled === true;
-    integrationAgent.textContent = agentReady ? '연결 확인됨' : (agentConfigured ? 'API 키 감지됨 · 통신 미검증' : 'API 키 없음 · 로컬 진단만 가능');
-    integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
-    integrationTransfer.textContent = agentConfigured ? '요청별 명시 동의 후 가능' : 'API 키 미설정 · 전송 없음';
-    integrationDetail.textContent = '로컬 연결 계약 ' + String(caps.contract_version || '미확인') + ' · 외부 AI는 매 요청 동의 필요. 실제 호출·모델 검증 상태를 과장하지 않습니다.';
-    document.getElementById('agent-status').textContent = agentReady ? '연결됨' : (agentConfigured ? '설정됨' : '미연결');
-    syncAgentButton();
+      const caps = await request('/api/integration/capabilities');
+      if (version !== keyRefreshVersion) return;
+      if (typeof caps.agent?.configured !== 'boolean') throw new Error('invalid_key_status');
+      const agentConfigured = caps.agent.configured;
+      const mlReady = caps.ml?.connected === true && caps.ml?.trained === true && caps.ml?.inference_enabled === true;
+      agentKeyConfigured = agentConfigured;
+      // configured=true only means the server process sees the environment
+      // variable. It is NOT proof that DeepSeek accepts the key.
+      integrationAgent.textContent = agentConfigured
+        ? '기존 API 키 감지됨 · 외부 연결 미검증'
+        : '서버 프로세스에 API 키 없음';
+      integrationMl.textContent = mlReady ? '연결 상태 보고됨' : '미연결 · 예측 불가';
+      integrationTransfer.textContent = agentConfigured ? '미전송 · 요청별 동의 시에만 가능' : 'API 키 미설정 · 전송 없음';
+      integrationDetail.textContent = '로컬 설정 확인 완료 · DeepSeek 유료 API는 호출하지 않았습니다. 모델과 통신 상태는 별도입니다.';
+      document.getElementById('agent-status').textContent = agentConfigured ? '설정됨' : '미연결';
+      agentKeyFeedback.textContent = agentConfigured
+        ? '기존 키가 서버에서 감지됐어요. 다시 발급하거나 입력할 필요가 없습니다. DeepSeek 실제 연결 성공은 아직 미검증이고 이 확인으로 비용은 발생하지 않습니다.'
+        : '현재 실행 중인 서버에서 키를 찾지 못했어요. 이전에 키가 있었다면 프로그램을 실행한 Windows 계정·환경변수 DEEPSEEK_API_KEY를 확인한 후 서버를 다시 시작하세요. 이 화면에 키를 입력하지 마세요.';
     } catch (_e) {
-    integrationAgent.textContent = '상태 확인 실패';
-    integrationMl.textContent = '상태 확인 실패';
-    integrationTransfer.textContent = '확인 불가';
-    document.getElementById('agent-status').textContent = '상태 확인 실패';
-    integrationDetail.textContent = '연동 상태 API 응답이 없습니다. AI·ML은 검증되지 않았으며 로컬 규칙 기반 검토만 이용하세요.';
-    agentKeyConfigured = null;
-    syncAgentButton();
+      if (version !== keyRefreshVersion) return;
+      agentKeyConfigured = null;
+      integrationAgent.textContent = '로컬 설정 조회 실패 · 키 유무 미확인';
+      integrationMl.textContent = '상태 확인 실패';
+      integrationTransfer.textContent = '확인 불가';
+      document.getElementById('agent-status').textContent = '확인 실패';
+      integrationDetail.textContent = '로컬 설정 조회가 실패했습니다. 키가 없다고 판단하지 않고 기본 진단만 유지합니다.';
+      agentKeyFeedback.textContent = '서버 연결 오류로 키 유무를 확인하지 못했어요. 서버 상태를 확인하고 다시 누르세요. 외부 AI 호출은 하지 않았습니다.';
+    } finally {
+      if (version === keyRefreshVersion) {
+        agentKeyRefresh.disabled = false;
+        syncAgentButton();
+      }
+    }
   }
-  })();
+  agentKeyRefresh.addEventListener('click', () => { void refreshLocalKeyPresence(); });
+  // The optional status request must not delay core diagnosis or button handlers.
+  void refreshLocalKeyPresence();
   // Optional AI evidence review: each request requires explicit consent and preview.
   // Demo input, safety hold, or incomplete selection never initiates an AI request.
   agentConsent = document.getElementById('agent-consent');
