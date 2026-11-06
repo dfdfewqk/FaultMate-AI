@@ -1,4 +1,4 @@
-name: FaultMate Stage7 KI21 known false negative real original RAR replay safety
+name: FaultMate P7 consolidated Linux Windows browser K001 KI21 safety gate
 on:
   push:
     branches:
@@ -17,6 +17,7 @@ on:
       - work/faultmate-p7-ai-error-connection-20261106
       - work/faultmate-p7-ai-result-evidence-20261106
       - work/faultmate-p7-operator-file-flow-20261106
+      - work/faultmate-p7-final-pr40-44-consolidation-cleanup-20261106
   pull_request:
     branches:
       - main
@@ -25,6 +26,7 @@ on:
       - work/faultmate-p7-existing-key-status-20261106
       - work/faultmate-p7-ai-error-connection-20261106
       - work/faultmate-p7-ai-result-evidence-20261106
+      - work/faultmate-p7-operator-file-flow-20261106
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
