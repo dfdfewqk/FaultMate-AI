@@ -59,7 +59,9 @@ def wilson_interval(successes: int, trials: int) -> list[float]:
     denominator = 1 + z * z / trials
     center = (p + z * z / (2 * trials)) / denominator
     half_width = z * sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials)) / denominator
-    return [max(0.0, center - half_width), min(1.0, center + half_width)]
+    # Roundoff at p=0 or p=1 must not create a tiny impossible bound.
+    return [0.0 if successes == 0 else max(0.0, center - half_width),
+            1.0 if successes == trials else min(1.0, center + half_width)]
 
 
 def verify_previous_evidence(feature_dir: Path, audits_dir: Path, baseline: Path):
