@@ -868,18 +868,62 @@
         add(agentResult, 'p', 'AI 요청이 전송됐을 수 있고 요금 발생 여부는 확인되지 않았어요. 자동 재요청하지 않습니다. 로컬 진단 결과는 그대로 사용하세요.', 'small-note');
       }
       if (result.status === 'reviewed' && result.agent_review) {
-        add(agentResult,'h4','AI 참고 검토 순서 · 원인 미확정');
-        for (const c of result.agent_review.candidate_causes) {
-          add(agentResult,'p',c.candidate + ' — ' + c.why_to_consider,'result-note');
+        const review = result.agent_review;
+        const prioritized = review.candidate_causes || [];
+        const remaining = review.other_candidate_causes || [];
+        const sourceById = new Map((review.sources || []).map(src => [src.id, src]));
+        add(agentResult,'h3','AI 참고 검토 결과 · 원인 미확정');
+        add(agentResult,'p','대상: ' + review.case_title + ' (' + review.case_id + ') · 기존 후보 ' +
+          (prioritized.length + remaining.length) + '개 중 AI가 먼저 확인할 후보 ' +
+          prioritized.length + '개를 제안했습니다. 나머지 후보도 유효성 검토 대상입니다.','agent-result-summary');
+        add(agentResult,'p','AI는 기존 등록 자료에서 확인 순서만 골랐습니다. 새로운 고장 원인·확률·정비 명령은 생성하지 않았습니다.','small-note');
+
+        // Only locally curated references can be displayed. Never insert
+        // untrusted model free text or external links through innerHTML.
+        function renderCauseWithEvidence(c, firstPriority, number) {
+          const entry = document.createElement('section');
+          entry.className = firstPriority ? 'agent-cause agent-cause-priority' : 'agent-cause';
+          agentResult.appendChild(entry);
+          add(entry,'b',(firstPriority ? 'AI 우선 검토 ' + number : '기존 후보 유지') +
+            ' · ' + c.candidate);
+          add(entry,'p','등록된 검토 사유: ' + c.why_to_consider,'result-note');
+          add(entry,'p','기존 관찰 분류: ' + c.review_group + ' · 현장 사실 확인 전','small-note');
+          for (const sourceId of c.source_ids || []) {
+            const source = sourceById.get(sourceId);
+            if (!source) continue;
+            addSafeSourceLink(entry, source, '근거 ' + source.id + ': ' + source.organization + ' — ' + source.title);
+            add(entry,'p','적용 한계: ' + source.limit,'small-note');
+          }
         }
-        add(agentResult,'h4','사용된 참고 자료·적용 한계');
-        for (const src of result.agent_review.sources) {
-          addSafeSourceLink(agentResult, src, src.organization + ' — ' + src.title);
-          add(agentResult,'p',src.limit,'small-note');
+        add(agentResult,'h4','1. 먼저 확인할 기존 원인 후보 (AI 선택)');
+        prioritized.forEach((c, idx) => renderCauseWithEvidence(c,true,idx + 1));
+        if (remaining.length) {
+          add(agentResult,'h4','2. AI 우선 목록 밖의 기존 후보 · 배제되지 않음');
+          add(agentResult,'p','AI가 우선으로 고르지 않았다는 사실은 해당 원인을 배제했다는 뜻이 아닙니다.','small-note');
+          remaining.forEach(c => renderCauseWithEvidence(c,false,0));
         }
-        if (result.agent_review.questions.length) {
-          add(agentResult,'h4','추가 확인 질문');
-          addList(agentResult,result.agent_review.questions);
+        add(agentResult,'h4','3. 부족한 정보·확인할 기존 기록');
+        if (review.questions?.length) {
+          add(agentResult,'p','AI가 먼저 확인하도록 고른 추가 질문','result-note');
+          addList(agentResult, review.questions);
+        }
+        if (review.other_questions?.length) {
+          add(agentResult,'p','우선 순위 밖의 추가 질문 · 여전히 확인 필요','result-note');
+          addList(agentResult, review.other_questions);
+        }
+        if (review.pending_observations?.length) {
+          add(agentResult,'p','기존 기록·원격 관찰에서 아직 확인되지 않은 항목','result-note');
+          addList(agentResult, review.pending_observations.map(q => q.question));
+        }
+        if (!(review.questions?.length || review.other_questions?.length || review.pending_observations?.length)) {
+          add(agentResult,'p','현재 목록에 추가 확인 항목은 없지만 원인 확정이나 안전 인증은 아닙니다.','small-note');
+        }
+        add(agentResult,'h4','4. 반드시 지킬 안전 조건');
+        add(agentResult,'p',review.safety_gate,'result-hold');
+        add(agentResult,'p','중단·보고 기준: ' + review.stop_escalation,'result-note');
+        if (review.limitations?.length) {
+          add(agentResult,'h4','적용 한계');
+          addList(agentResult,review.limitations);
         }
       }
       // A provider timeout/error may occur AFTER an HTTP request was sent.
