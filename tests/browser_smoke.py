@@ -212,6 +212,31 @@ async def run():
         await page.unroute("**/api/ml/experimental-original-rar", rar_over_limit)
         counts["ui_checks"] += 2
 
+        # Changing the original RAR WHILE the local request has started must
+        # discard the old result and WARN that a server-side scan may continue.
+        rar_started = asyncio.Event()
+        async def delayed_rar_success(route):
+            rar_started.set()
+            await asyncio.sleep(.5)
+            try:
+                await route.fulfill(status=200, content_type="application/json",
+                    body='{"status":"experimental_unapproved","message":"OUTDATED_FILE_RESULT_NEVER_SHOW"}')
+            except Exception:
+                pass  # Browser canceled the read after the user changed file
+        await page.route("**/api/ml/experimental-original-rar", delayed_rar_success)
+        await page.locator("#raw-rar-run").click()
+        await asyncio.wait_for(rar_started.wait(), timeout=6)
+        await page.locator("#raw-rar-upload").set_input_files({
+            "name":"KI21.rar", "mimeType":"application/octet-stream",
+            "buffer":b"NEW_LOCAL_RAR_FILE_NO_REAL_SENSOR_DATA"})
+        assert "서버에서 계속될 수 있습니다" in await page.locator("#raw-rar-feedback").inner_text()
+        await page.wait_for_timeout(650)
+        assert "OUTDATED_FILE_RESULT_NEVER_SHOW" not in await page.locator("#raw-rar-feedback").inner_text()
+        assert not (await page.locator("#raw-rar-result").inner_text()).strip()
+        assert await page.locator("#raw-rar-run").is_enabled()
+        await page.unroute("**/api/ml/experimental-original-rar", delayed_rar_success)
+        counts["ui_checks"] += 4
+
         # Malformed fragments must not interrupt later UI interactions.
         await page.evaluate("location.hash = '%E0%A4%A'; window.dispatchEvent(new HashChangeEvent('hashchange'))")
         assert await page.locator("#ml-run").is_enabled()
