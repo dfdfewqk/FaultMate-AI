@@ -7,13 +7,17 @@ import pytest
 from fastapi.testclient import TestClient
 from faultmate.app import app
 from faultmate.integration import agent, ml
+from faultmate.integration.context import ContextPreviewRequest, evidence_preview
 
 
 def payload(hazard='no',case='CONV-001',consent=True):
-    return {'triage':{'case_id':case,'equipment':'컨베이어',
+    p = {'triage':{'case_id':case,'equipment':'컨베이어',
        'symptom_text':'PERSONAL_SECRET_NEVER_SEND','model_name':'PRIVATE_MACHINE_NAME',
        'alarm_text':'PRIVATE_ALARM_LOG','emergency_hazard':hazard,
        'observations':{'visible_jam':'yes'}},'consent':consent}
+    p['context_sha256'] = evidence_preview(
+        ContextPreviewRequest(triage=p['triage']))['context_sha256']
+    return p
 
 
 def valid_csv():
@@ -118,10 +122,17 @@ def test_train_pipeline_group_split_and_release_gate(tmp_path):
                     vibration_rms_m_s2=scale+trial*.08, vibration_peak_m_s2=scale*2+trial*.08,
                     current_rms_a=scale*.2+trial*.01,label=label,
                     label_provenance=f'fixture_{index}',license='test-only'))
-    report=train(path,tmp_path/'out')
+    report=train(path,tmp_path/'out',test_fixture_only=True)
     model=json.loads((tmp_path/'out'/'bearing_evaluated.json').read_text())
     assert model['status']=='evaluated_pending_review'
     assert not (tmp_path/'out'/'bearing_validated.json').exists()
     groups=json.loads((tmp_path/'out'/'evaluation_report.json').read_text())['partition_by_asset']
     assert len(groups)==12 and set(groups.values())=={'train','validation','test'}
     assert 'heldout_macro_f1' in report
+    # A bearing, not a recording, is the independent test unit.
+    assert 'heldout_bearing_macro_f1' in report
+    assert len(report['heldout_bearing_predictions']) == report['test_asset_count']
+    assert sum(map(sum, report['heldout_bearing_confusion_matrix'])) == report['test_asset_count']
+    assert report['heldout_bearing_damage_missed_count'] >= 0
+    assert report['heldout_bearing_false_damage_alarm_count'] >= 0
+    assert model['provenance_check'] == {'status': 'synthetic_software_test_only'}

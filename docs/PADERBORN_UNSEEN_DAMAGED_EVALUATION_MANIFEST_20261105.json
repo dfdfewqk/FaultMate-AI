@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "purpose": "ONE-TIME previously unseen damaged-only evaluation of frozen real Paderborn model, no training, no tuning, no automatic approval",
+  "preregistered_before_download": true,
+  "historical_development_assets": [
+    "K001",
+    "K002",
+    "K003",
+    "K004",
+    "K005",
+    "KA04",
+    "KA16",
+    "KB23",
+    "KI04",
+    "KI16"
+  ],
+  "historical_opened_holdout_assets": [
+    "K006",
+    "KI18"
+  ],
+  "original_model_sha256": "84a7c059fa769d1b0e2bd0075ecba92bcd06ae24acf961e0ea2120d9d44a0ab0",
+  "original_model_relative_path": "docs/experiments/PADERBORN_BEARING_AGGREGATED_UNAPPROVED_20261105.json",
+  "fixed_threshold": 0.5,
+  "mandatory_conditions": [
+    "N09_M07_F10",
+    "N15_M01_F10",
+    "N15_M07_F04",
+    "N15_M07_F10"
+  ],
+  "files_per_bearing": 80,
+  "dataset_source": "https://mb.uni-paderborn.de/en/kat/research/bearing-datacenter/data-sets-and-download",
+  "source_checkums": "https://zenodo.org/records/15845309",
+  "primary_damaged_label_reference": "https://mb.uni-paderborn.de/fileadmin-mb/kat/PDF/Veroeffentlichungen/20160703_PHME16_CM_bearing.pdf#page=6",
+  "primary_damaged_label_location": "Lessmeier et al. (2016), Table 5",
+  "license": "CC BY-NC 4.0",
+  "limits": [
+    "There are NO previously unused healthy specimens in original Paderborn collection.",
+    "Damaged-only sensitivity is not overall accuracy, specificity or field generalization.",
+    "Model input needs all four operating conditions and 80 original recordings per bearing.",
+    "Raw numeric sensors not source-certified SI.",
+    "No runtime model activation, no paid API, no packaging."
+  ],
+  "assets": [
+    {
+      "id": "KA15",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "db518f97ba5bcaedb09c648a317431e0"
+    },
+    {
+      "id": "KA22",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "7a16a5bc88d5fe1d83d169f88f0709e8"
+    },
+    {
+      "id": "KA30",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "715c0cf7862a7ba83e7c6a6fb5c91a61"
+    },
+    {
+      "id": "KB24",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "c60ce8867c824583540794ae00cce333"
+    },
+    {
+      "id": "KB27",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "965dd4af26391d7def4638c8b31a87e7"
+    },
+    {
+      "id": "KI14",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "13603834975435ca10eb08de6d1840dc"
+    },
+    {
+      "id": "KI17",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "d1055fe5cc44948e5d3a39f2e0db9dbe"
+    },
+    {
+      "id": "KI21",
+      "label": "damaged",
+      "damage_origin": "accelerated_lifetime",
+      "md5": "911ce3e37a86d258818e3e93274752a2"
+    }
+  ]
+}

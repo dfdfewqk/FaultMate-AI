@@ -1,0 +1,57 @@
+name: K001 one-time provenance and MAT inspection
+on:
+  push:
+    branches:
+      - work/faultmate-ml-converter-fix-20261030
+    paths:
+      - .github/workflows/validate-k001.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-k001:
+    name: Verify Zenodo K001 and inspect one MAT recording (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install inspection-only dependencies
+        run: python -m pip install --disable-pip-version-check numpy scipy
+      - name: Download official archive to ephemeral runner storage
+        shell: pwsh
+        run: |
+          $url = 'https://zenodo.org/records/15845309/files/K001.rar?download=1'
+          $archive = Join-Path $env:RUNNER_TEMP 'K001.rar'
+          & curl.exe --fail --location --retry 2 --connect-timeout 20 --max-time 420 --silent --show-error $url --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item $archive | Select-Object FullName, Length
+      - name: Verify official MD5, SHA-256, 7-Zip integrity and 80 recordings
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'K001.rar'
+          $report = Join-Path $env:RUNNER_TEMP 'k001-provenance.json'
+          python scripts/verify_k001_archive.py --archive $archive > $report
+          if ($LASTEXITCODE -ne 0) { Get-Content $report; exit $LASTEXITCODE }
+          Get-Content $report
+      - name: Inspect one real MATLAB recording; keep unknown units unknown
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'K001.rar'
+          $report = Join-Path $env:RUNNER_TEMP 'k001-channels.json'
+          python scripts/inspect_paderborn_archive.py --archive $archive > $report
+          if ($LASTEXITCODE -ne 0) { Get-Content $report; exit $LASTEXITCODE }
+          Get-Content $report
+      - name: Upload JSON inspection evidence only (no raw signals)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k001-validation-windows-json
+          path: |
+            ${{ runner.temp }}/k001-provenance.json
+            ${{ runner.temp }}/k001-channels.json
+          if-no-files-found: warn
+          retention-days: 7

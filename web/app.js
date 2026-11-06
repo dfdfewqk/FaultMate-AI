@@ -221,6 +221,7 @@
   let agentRequestController = null;
   let agentPreviewVersion = 0;
   let lastPreviewVersion = -1;
+  let agentReviewedContextHash = null;
   const syncTriageButton = () => {
     triageSubmit.disabled = !triageOptions || !triageCase.value || triageHazard.value === 'yes' || !!activeTriageController;
     demoButton.disabled = !triageOptions || triageHazard.value === 'yes';
@@ -705,12 +706,13 @@
     if (!agentRun || !agentConsent) return;
     agentPreviewButton.disabled = triageHazard.value === 'yes';
     agentRun.disabled = !triageCase.value || !triageOptions || demoMode || triageHazard.value === 'yes' ||
-      !agentConsent.checked || lastPreviewVersion !== agentPreviewVersion || !!agentRequestController;
+      !agentConsent.checked || !agentReviewedContextHash || lastPreviewVersion !== agentPreviewVersion || !!agentRequestController;
   }
   function invalidateAgentReview() {
     if (!agentConsent || !agentRun) return;
     ++agentPreviewVersion;
     lastPreviewVersion = -1;
+    agentReviewedContextHash = null;
     if (agentRequestController) { agentRequestController.abort(); agentRequestController = null; }
     agentPreviewContent.hidden = true;
     agentPreviewContent.textContent = '';
@@ -726,6 +728,7 @@
     }
     const version = ++agentPreviewVersion;
     lastPreviewVersion = -1;
+    agentReviewedContextHash = null;
     agentConsent.checked = false;
     agentPreviewContent.hidden = true;
     agentPreviewContent.textContent = '';
@@ -742,6 +745,8 @@
       const data = await response.json();
       if (version !== agentPreviewVersion || triageHazard.value === 'yes' || demoMode) return;
       if (data.state !== 'candidate_review' || data.allowed_for_agent_reasoning !== true) throw new Error('preview_blocked');
+      if (typeof data.context_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(data.context_sha256)) throw new Error('preview_fingerprint_invalid');
+      agentReviewedContextHash = data.context_sha256;
       agentPreviewContent.textContent = JSON.stringify(data.context, null, 2);
       agentPreviewContent.hidden = false;
       lastPreviewVersion = agentPreviewVersion;
@@ -750,7 +755,7 @@
     } catch (_e) {
       if (version !== agentPreviewVersion) return;
       agentFeedback.textContent = '전송 예정 자료를 생성하지 못했습니다. AI 사용은 차단됩니다.';
-      lastPreviewVersion = -1; syncAgentButton();
+      lastPreviewVersion = -1; agentReviewedContextHash = null; syncAgentButton();
     }
   });
   agentRun.addEventListener('click', async () => {
@@ -764,7 +769,7 @@
     try {
       const response = await fetch('/api/agent/review', {method:'POST',
         headers:{'Content-Type':'application/json'},cache:'no-store',signal:controller.signal,
-        body:JSON.stringify({triage:currentPayload(),consent:true})});
+        body:JSON.stringify({triage:currentPayload(),consent:true,context_sha256:agentReviewedContextHash})});
       if (!response.ok) throw new Error('agent_unavailable');
       const result = await response.json();
       if (version !== agentPreviewVersion || triageHazard.value === 'yes' || controller.signal.aborted) return;
@@ -785,15 +790,20 @@
           addList(agentResult,result.agent_review.questions);
         }
       }
-      agentFeedback.textContent = result.external_transfer_performed ? '외부 AI 검토 응답 수신 · 고장 확정 아님' :
-        '외부 AI 결과 없음 · 기존 로컬 진단 사용';
+      // A provider timeout/error may occur AFTER an HTTP request was sent.
+      // Never imply "no transfer" unless the server explicitly confirms it.
+      agentFeedback.textContent = result.external_transfer_performed === true
+        ? '외부 AI 검토 응답 수신 · 고장 확정 아님'
+        : result.external_transfer_performed === null || result.external_transfer_attempted === true
+          ? '외부 AI 전송 여부 확인 불가 · 재요청 전 미리보기와 동의 재확인'
+          : '외부 AI 전송 없음 · 기존 로컬 진단 사용';
     } catch (_e) {
-      if (version === agentPreviewVersion && !controller.signal.aborted) agentFeedback.textContent = 'AI 연결 실패 · 기존 로컬 진단 유지';
+      if (version === agentPreviewVersion && !controller.signal.aborted) agentFeedback.textContent = 'AI 연결 실패 · 외부 전송 여부 확인 불가 · 기존 로컬 진단 유지';
     } finally {
       if (version === agentPreviewVersion) {
         agentRequestController = null;
         agentConsent.checked = false;
-        lastPreviewVersion = -1; syncAgentButton();
+        lastPreviewVersion = -1; agentReviewedContextHash = null; syncAgentButton();
       }
     }
   });
@@ -847,6 +857,200 @@
       if (version === mlRequestVersion) {
         activeMlController = null;
         mlRun.disabled = triageHazard.value === 'yes';
+      }
+    }
+  });
+  const researchInput = document.getElementById('research-upload');
+  const researchRun = document.getElementById('research-run');
+  const researchFeedback = document.getElementById('research-feedback');
+  const researchResult = document.getElementById('research-result');
+  let researchVersion = 0;
+  let researchController = null;
+  function invalidateResearch(message) {
+    ++researchVersion;
+    if (researchController) { researchController.abort(); researchController = null; }
+    researchResult.replaceChildren();
+    researchFeedback.textContent = message;
+    researchInput.disabled = triageHazard.value === 'yes';
+    researchRun.disabled = triageHazard.value === 'yes' || !researchInput.files || !researchInput.files.length;
+  }
+  researchInput.addEventListener('change', () => invalidateResearch(
+    '실험용 특징 보고서가 변경되었습니다. 원본 검증과 정식 고장 판단은 별개입니다.'));
+  triageHazard.addEventListener('change', () => invalidateResearch(
+    triageHazard.value === 'yes'
+      ? '긴급 위험: 연구용 ML 점수 계산을 중단했습니다.'
+      : '80회 원본에서 추출한 특징 JSON만 연구용으로 점수를 계산합니다.'));
+  researchRun.addEventListener('click', async () => {
+    if (triageHazard.value === 'yes' || researchRun.disabled) return;
+    const file = researchInput.files && researchInput.files[0];
+    if (!file || file.size <= 0 || file.size > 512000 || !file.name.toLowerCase().endsWith('.json')) {
+      invalidateResearch('512KB 이하의 원본 특징 .json 파일을 선택하세요.'); return;
+    }
+    const version = ++researchVersion;
+    const controller = new AbortController();
+    researchController = controller;
+    researchResult.replaceChildren();
+    researchRun.disabled = true;
+    researchFeedback.textContent = '로컬 Paderborn 연구모델 계산 중...';
+    try {
+      const res = await fetch('/api/ml/experimental-unitless-report', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:file,cache:'no-store', signal:controller.signal,
+      });
+      if (!res.ok) throw new Error('research_report_http_invalid');
+      const result = await res.json();
+      if (version !== researchVersion || controller.signal.aborted || triageHazard.value === 'yes') return;
+      researchFeedback.textContent = result.message || '실험용 분석을 완료하지 못했습니다.';
+      if (result.status === 'experimental_unapproved' &&
+          result.research_inference_performed === true &&
+          result.model_approved_for_runtime === false &&
+          result.confirmed_fault === false && result.safe_to_work === false &&
+          (result.experimental_predicted_label === 'healthy' ||
+           result.experimental_predicted_label === 'damaged') &&
+          typeof result.experimental_damage_model_score === 'number') {
+        add(researchResult,'h4','Paderborn 연구 모델 · 미승인 실험 결과');
+        add(researchResult,'p',
+          result.bearing_id + ' / 모델 분류: ' +
+          (result.experimental_predicted_label === 'healthy' ? '정상 쪽' : '손상 쪽') +
+          ' / 손상 판별 점수 ' + result.experimental_damage_model_score.toFixed(4),
+          'result-note');
+        add(researchResult,'p',
+          '측정 수 ' + result.input_recordings + '회 · 중복 제외 후 ' +
+          result.unique_signal_pairs_reported + '개 · 업로드한 JSON으로 원본 측정파일의 진위를 검증할 수 없습니다.',
+          'small-note');
+        add(researchResult,'p',
+          '실험용 ML 점수는 현장 고장 확률·원인 확정·정비 허가가 아닙니다. 독립 정상 베어링 검증 미완료.',
+          'result-hold');
+      }
+    } catch (_e) {
+      if (version === researchVersion && !controller.signal.aborted) {
+        researchFeedback.textContent = '로컬 연구 ML 처리 실패 · 기존 진단 결과는 유지됩니다.';
+      }
+    } finally {
+      if (version === researchVersion) {
+        researchController = null;
+        researchRun.disabled = triageHazard.value === 'yes' || !researchInput.files || !researchInput.files.length;
+      }
+    }
+  });
+  // Optional research-only direct original source upload.
+  // No original signal leaves localhost. The backend rechecks archive MD5,
+  // the full original 80 MAT records and the pinned frozen science model.
+  const rawRarInput = document.getElementById('raw-rar-upload');
+  const rawRarRun = document.getElementById('raw-rar-run');
+  const rawRarFeedback = document.getElementById('raw-rar-feedback');
+  const rawRarResult = document.getElementById('raw-rar-result');
+  const maxOriginalRar = 768 * 1024 * 1024;
+  let rawRarVersion = 0;
+  let rawRarController = null;
+  function invalidateRawRar(message) {
+    ++rawRarVersion;
+    if (rawRarController) {
+      rawRarController.abort();
+      rawRarController = null;
+    }
+    rawRarResult.replaceChildren();
+    rawRarFeedback.textContent = message;
+    rawRarInput.disabled = triageHazard.value === 'yes';
+    rawRarRun.disabled = triageHazard.value === 'yes' ||
+      !(rawRarInput.files && rawRarInput.files.length);
+  }
+  rawRarInput.addEventListener('change', () => invalidateRawRar(
+    '원본 파일이 바뀌었습니다. 실행하면 로컬에서 원저자 MD5와 80개 MAT를 다시 확인합니다.'));
+  triageHazard.addEventListener('change', () => invalidateRawRar(
+    triageHazard.value === 'yes'
+      ? '긴급 위험: 화면의 ML 결과를 숨겼습니다. 이미 시작된 로컬 파일 검사는 종료될 때까지 이어질 수 있습니다.'
+      : '원본 베어링 RAR을 선택하면 임시 파일로 검증하고 연구용 ML 점수를 표시합니다.'));
+  rawRarRun.disabled = true;
+  rawRarInput.disabled = triageHazard.value === 'yes';
+
+  rawRarRun.addEventListener('click', async () => {
+    if (rawRarRun.disabled || triageHazard.value === 'yes') return;
+    const file = rawRarInput.files && rawRarInput.files[0];
+    const validName = file && /^([a-z]{1,2}\d{2,3})\.rar$/i.exec(file.name);
+    if (!validName || file.size < 100000000 || file.size > maxOriginalRar) {
+      invalidateRawRar('100MB 이상·768MiB 이하인 공식 Paderborn 베어링 RAR 파일을 선택하세요.');
+      return;
+    }
+    const asset = validName[1].toUpperCase();
+    const version = ++rawRarVersion;
+    const controller = new AbortController();
+    rawRarController = controller;
+    rawRarResult.replaceChildren();
+    rawRarRun.disabled = true;
+    rawRarFeedback.textContent =
+      '원본을 로컬 서버에 전달하고 MD5·80개 진동/전류 MAT·고정 ML을 검증 중입니다. 새 파일을 선택하지 마세요.';
+    try {
+      const res = await fetch('/api/ml/experimental-original-rar', {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/octet-stream',
+          'X-FaultMate-Bearing-ID':asset,
+        },
+        body:file, cache:'no-store',signal:controller.signal,
+      });
+      const result = await res.json();
+      if (version !== rawRarVersion || controller.signal.aborted ||
+          triageHazard.value === 'yes') return;
+      if (!res.ok) {
+        rawRarFeedback.textContent =
+          res.status === 409 ? '다른 원본 분석이 진행 중입니다. 완료 후 다시 실행하세요.' :
+          res.status === 413 ? '최대 768MiB 파일 크기를 넘었습니다.' :
+          res.status === 507 ? '로컬 임시 저장 공간이 부족해 검사를 중단했습니다.' :
+          '원본 RAR 형식·종류 또는 요청을 확인할 수 없습니다. 예측하지 않았습니다.';
+        return;
+      }
+      rawRarFeedback.textContent = result.message ||
+        '원본 데이터의 검증에 실패하여 예측하지 않았습니다.';
+      if (result.status === 'experimental_unapproved' &&
+          result.research_inference_performed === true &&
+          result.original_rar_md5_verified_in_this_request === true &&
+          result.source_mat_files_actually_read_this_run === 80 &&
+          result.model_approved_for_runtime === false &&
+          result.confirmed_fault === false && result.safe_to_work === false &&
+          (result.experimental_predicted_label === 'healthy' ||
+           result.experimental_predicted_label === 'damaged') &&
+          typeof result.experimental_damage_model_score === 'number') {
+        add(rawRarResult,'h4','원본 RAR 실측 검증 + 연구용 ML · 미승인');
+        add(rawRarResult,'p',
+          result.bearing_id + ' / 실험 분류: ' +
+          (result.experimental_predicted_label === 'healthy' ? '정상 쪽' : '손상 쪽') +
+          ' / 모델 손상 판별 점수 ' +
+          result.experimental_damage_model_score.toFixed(4), 'result-note');
+        add(rawRarResult,'p',
+          '원본 MD5 확인 · 실제 MATLAB 측정 80회 · 중복 제외 후 ' +
+          result.source_unique_signal_pairs + '개', 'small-note');
+        if (result.previously_opened_damaged_test_replay_not_new_evaluation === true) {
+          add(rawRarResult,'p',
+            '실측 연구 원본 정답: 손상. 이 베어링은 과거 8개 손상 평가에 이미 사용했습니다. ' +
+            '이번 실행은 이미 알려진 자료를 다시 계산한 것이지 새 독립 검증이 아닙니다.',
+            'small-note');
+        } else {
+          add(rawRarResult,'p',
+            '기존 학습 또는 이전 시험에 이미 사용한 베어링입니다. ' +
+            '학습 데이터 결과를 새로운 정확도 검증으로 취급하지 않습니다.',
+            'small-note');
+        }
+        // Every authenticated damaged source must warn when scored healthy,
+        // regardless of whether it came from development or prior evaluation.
+        if (result.source_known_research_truth_label === 'damaged' &&
+            result.experimental_predicted_label === 'healthy') {
+          add(rawRarResult,'p',
+            '주의 — 실제 손상 베어링을 모델이 정상 쪽으로 잘못 예측한 미탐입니다. ' +
+            '정상 표시만 보고 운전·작업 안전을 판단하면 안 됩니다.', 'result-hold');
+        }
+        add(rawRarResult,'p',
+          '정식 승인되지 않은 연구 모델. 독립 정상 베어링 오경보율·현장 정확도 미검증. ' +
+          '실제 설비 고장 확정·고장 확률·작업 허가 아님.', 'result-hold');
+      }
+    } catch (_e) {
+      if (version === rawRarVersion && !controller.signal.aborted)
+        rawRarFeedback.textContent = '로컬 원본 분석 요청이 중단되거나 실패했습니다. 업로드가 이미 끝났다면 서버 검사가 이어질 수 있습니다.';
+    } finally {
+      if (version === rawRarVersion) {
+        rawRarController = null;
+        rawRarRun.disabled = triageHazard.value === 'yes' ||
+          !(rawRarInput.files && rawRarInput.files.length);
       }
     }
   });

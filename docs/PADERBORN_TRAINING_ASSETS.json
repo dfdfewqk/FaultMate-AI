@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "dataset": "Paderborn Bearing DataCenter",
+  "dataset_citation": "Christian Lessmeier et al. (2016), KAt DataCenter, Paderborn University",
+  "dataset_source": "https://mb.uni-paderborn.de/en/kat/research/bearing-datacenter",
+  "file_checksum_source": "https://zenodo.org/records/15845309",
+  "bearing_label_source": "https://mb.uni-paderborn.de/fileadmin-mb/kat/PDF/Veroeffentlichungen/20160703_PHME16_CM_bearing.pdf",
+  "license": "CC BY-NC 4.0",
+  "archive_unit_evidence_status": "unverified",
+  "purpose": "Source-backed archive readiness audit only, not a training dataset or unit calibration assertion",
+  "assets": [
+    {"id":"K001","label":"healthy","damage_origin":"none","md5":"af6dc58283d356cd438e7738a2d525b8"},
+    {"id":"K002","label":"healthy","damage_origin":"none","md5":"88631bc0081a6470846d18189d46381d"},
+    {"id":"K003","label":"healthy","damage_origin":"none","md5":"08b61792e1058dc47dd21071666bca2c"},
+    {"id":"K004","label":"healthy","damage_origin":"none","md5":"5b9fde1c6d754806539f9a890ee6bbdd"},
+    {"id":"K005","label":"healthy","damage_origin":"none","md5":"28d91412ad14583fbdfda958b64a8267"},
+    {"id":"K006","label":"healthy","damage_origin":"none","md5":"b36389294fc5a21539d9fcfacfa3604a"},
+    {"id":"KA04","label":"damaged","damage_origin":"accelerated_lifetime","md5":"f87503ed69a624ba6e1d9e573e6c09fb"},
+    {"id":"KA16","label":"damaged","damage_origin":"accelerated_lifetime","md5":"ef848f5621f9c10523c313131d1a4c21"},
+    {"id":"KB23","label":"damaged","damage_origin":"accelerated_lifetime","md5":"bb87c72669baa9dbbefd10b5294ffcc8"},
+    {"id":"KI04","label":"damaged","damage_origin":"accelerated_lifetime","md5":"a5a634fcdcb33a8501e7411d30441c6d"},
+    {"id":"KI16","label":"damaged","damage_origin":"accelerated_lifetime","md5":"db14eae04a213afd0d1ca99d3d850342"},
+    {"id":"KI18","label":"damaged","damage_origin":"accelerated_lifetime","md5":"db5da511e9240dbc56ec1e850fd91699"}
+  ]
+}

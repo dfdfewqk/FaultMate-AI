@@ -1,0 +1,556 @@
+name: FaultMate Stage7 KI21 known false negative real original RAR replay safety
+on:
+  push:
+    branches:
+      - work/faultmate-stage7-known-damage-replay-20261106
+      - work/faultmate-stage7-dev-miss-warning-20261106
+      - work/faultmate-stage7-ki21-feature-attribution-20261106
+      - work/faultmate-stage7-ki21-condition-slices-20261106
+      - work/faultmate-stage7-ki21-current-scaler-20261106
+      - work/faultmate-stage7-current-dev-reference-20261106
+      - work/faultmate-stage7-dev-trial-spread-20261106
+      - work/faultmate-stage7-independent-test-gate-20261106
+      - work/faultmate-stage7-final-integration-cancel-safety-20261106
+      - work/faultmate-final-consolidated-review-20261106
+  pull_request:
+    branches:
+      - main
+      - work/faultmate-stage7-direct-raw-rar-ml-20261105
+      - work/faultmate-stage7-known-damage-replay-20261106
+      - work/faultmate-stage7-dev-miss-warning-20261106
+      - work/faultmate-stage7-ki21-feature-attribution-20261106
+      - work/faultmate-stage7-ki21-condition-slices-20261106
+      - work/faultmate-stage7-ki21-current-scaler-20261106
+      - work/faultmate-stage7-current-dev-reference-20261106
+      - work/faultmate-stage7-dev-trial-spread-20261106
+      - work/faultmate-stage7-independent-test-gate-20261106
+
+permissions:
+  contents: read
+
+jobs:
+  linux-full-and-readiness:
+    name: Linux complete Python + source compatibility + real local HTTP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing packages and test-only dependencies
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: All Stage 1-7 + BJTU independent normal source evidence guard, local HTTP and JavaScript
+        run: |
+          python -m pytest -q tests
+          python -m compileall -q faultmate scripts
+          node --check web/app.js
+          PYTHONPATH=. python tests/live_http_smoke.py
+      - name: Independent physical-bearing prospective readiness remains blocked (offline)
+        run: |
+          python scripts/audit_independent_bearing_preflight.py --out /tmp/faultmate_independent_bearing_plan_gate.json > /tmp/faultmate_independent_preflight_console.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/faultmate_independent_bearing_plan_gate.json',encoding='utf-8'))
+          assert d['status']=='NO_GO_NO_NEW_PROSPECTIVE_PHYSICAL_BEARING_COHORT'
+          assert d['original_frozen_model_verified'] is True
+          assert d['paderborn_all_six_healthy_previously_opened'] is True
+          assert d['existing_public_candidate_sources_reviewed']==4
+          assert d['new_independent_normal_bearings_verified']==0
+          assert d['new_independent_damaged_bearings_verified']==0
+          assert d['new_independent_specificity_or_accuracy_measured'] is False
+          assert d['production_ml_activation_allowed'] is False
+          assert d['model_retrained_or_scored'] is False
+          assert d['paid_api_called'] is False
+          assert d['draft_not_a_preregistered_study'] is True
+          assert all(len(x['reasons'])>0 for x in d['source_rejections'])
+          print('PROSPECTIVE_4_SOURCES_NO_NEW_HEALTHY_BEARINGS_RESEARCH_NO_GO_PASS')
+          PY
+      - name: Offline final readiness report - local checks PASS but actual release BLOCKED
+        run: |
+          python scripts/preflight_final_acceptance.py --out /tmp/faultmate_stage7_readiness.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/faultmate_stage7_readiness.json', encoding='utf-8'))
+          assert d['automatic_local_checks_passed'] is True
+          assert d['release_ready'] is False
+          assert d['paid_api_requests_performed'] == 0
+          assert d['experimental_model_activated'] is False
+          assert len(d['only_user_can_complete']) == 2
+          print('LOCAL_PREFLIGHT_PASS_RELEASE_GATED_USER_STEPS_LISTED')
+          PY
+      - name: BJTU original author's 51-state 9-condition 4-CSV physical asset count guard
+        run: |
+          python scripts/audit_bjtu_primary_layout.py --out /tmp/faultmate_bjtu_documented_structure.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/faultmate_bjtu_documented_structure.json'))
+          assert data['documented_normal_health_states'] == 1
+          assert data['documented_normal_operating_conditions'] == 9
+          assert data['documented_normal_csv_files'] == 36
+          assert data['documented_all_csv_files'] == 1836
+          assert data['nine_conditions_are_nine_independent_bearings'] is False
+          assert data['source_healthy_physical_bearings_verified'] == 0
+          assert data['false_positive_rate_measured'] is False
+          print('BJTU_ORIGINAL_SOURCE_DOCUMENT_LAYOUT_CONFIRMED_NO_FAKE_NORMAL_ASSETS')
+          PY
+      - name: Split archives size budget and unsafe large-download guard offline
+        run: |
+          python scripts/preflight_bjtu_split_archive_size.py \
+            --out /tmp/faultmate_bjtu_archive_feasibility.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/faultmate_bjtu_archive_feasibility.json"))
+          assert d["author_archive_part_count_expected"] == 3
+          assert d["safe_to_auto_download_or_extract_large_archive"] is False
+          assert d["original_csv_or_split_zip_data_downloaded"] is False
+          assert d["new_physically_independent_normal_bearings_verified"] == 0
+          print("SPLIT_ARCHIVE_BUDGET_GUARD_BLOCKS_UNCONTROLLED_FULL_ARCHIVE_FETCH")
+          PY
+      - name: DeepSeek final live acceptance command MUST remain offline without paid flags
+        run: |
+          python scripts/optional_deepseek_one_call_acceptance.py > /tmp/deepseek_acceptance_offline.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/deepseek_acceptance_offline.json"))
+          assert d["mode"] == "offline_preflight_only"
+          assert d["paid_request_attempted"] is False
+          assert d["api_key_read_or_printed"] is False
+          assert d["real_deepseek_connectivity_confirmed"] is False
+          print("LIVE_DEEPSEEK_NOT_CALLED_OFFLINE_ACCEPTANCE_PASS")
+          PY
+      - name: Research ML release decision using pinned real model, NO active ML
+        run: |
+          python scripts/decide_bearing_ml_application.py \
+            --out /tmp/faultmate_ml_application_decision.json
+          python - <<'PY'
+          import json
+          from faultmate.integration.ml import load_validated_model
+          d=json.load(open("/tmp/faultmate_ml_application_decision.json"))
+          assert d["original_real_training_model_content_verified"] is True
+          assert d["production_ml_activation_allowed"] is False
+          assert d["general_accuracy_measured"] is False
+          assert d["historical_damaged_evaluation"]["numbers_recomputed_in_this_command"] is False
+          assert d["new_independent_healthy_bearings_original_signals_verified"] == 0
+          assert load_validated_model() is None
+          print("EXPERIMENTAL_ML_TRAINED_MODEL_PROTECTED_NO_GO_VERIFIED")
+          PY
+      - name: "Public dataset evidence gate: no fabricated new healthy test accuracy"
+        run: |
+          python scripts/audit_external_healthy_compatibility.py \
+            --out /tmp/faultmate_public_healthy_source_readiness.json
+          python - <<'PY'
+          import json
+          from faultmate.integration.ml import load_validated_model
+          d=json.load(open('/tmp/faultmate_public_healthy_source_readiness.json'))
+          assert d['no_approved_healthy_source'] is True
+          assert d['new_healthy_bearings_validated'] == 0
+          assert d['false_positive_rate_measured'] is False
+          assert d['overall_accuracy_measured'] is False
+          assert all(x['direct_frozen_model_prediction_allowed'] is False for x in d['results'])
+          assert load_validated_model() is None
+          print('STAGE7_HEALTHY_SOURCES_BLOCKED_NO_FABRICATED_SPECIFICITY')
+          PY
+
+  windows-python-and-launcher:
+    name: Windows whole Python + real batch start + no API transfer
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Existing Windows bootstrap (isolated CI runner)
+        shell: cmd
+        run: call setup_windows.bat
+      - name: Install test-only machine learning + HTTP test dependencies
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt pytest httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Whole Windows Python + cross-site agent/DNS rebinding safety + launcher smoke
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pytest -q tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe tests/windows_launcher_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install test-only Playwright Chromium on the isolated Windows runner
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe -m pip install playwright
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe -m playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real Windows .bat to uvicorn TCP to native Chromium full user acceptance
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe tests/windows_native_browser_acceptance.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "WINDOWS_REAL_LOCALHOST_CHROMIUM_ACCEPTANCE_PASS_PAID_ZERO"
+      - name: Windows offline readiness report without paid API call
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/preflight_final_acceptance.py --out "$env:RUNNER_TEMP\faultmate_readiness.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content "$env:RUNNER_TEMP\faultmate_readiness.json" -Raw | ConvertFrom-Json
+          if ($r.automatic_local_checks_passed -ne $true -or $r.release_ready -ne $false -or $r.paid_api_requests_performed -ne 0) {
+            throw "Release gate or automatic readiness has an invalid state"
+          }
+          Write-Output "WINDOWS_OFFLINE_PREFLIGHT_PASS_RELEASE_NOT_READY"
+      - name: Windows live DeepSeek paid acceptance stays OFFLINE without explicit user consent
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/optional_deepseek_one_call_acceptance.py > "$env:RUNNER_TEMP\deepseek_acceptance_offline.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $d = Get-Content "$env:RUNNER_TEMP\deepseek_acceptance_offline.json" -Raw | ConvertFrom-Json
+          if ($d.paid_request_attempted -ne $false -or $d.mode -ne "offline_preflight_only") {
+            throw "Paid DeepSeek API was not gated"
+          }
+          Write-Output "WINDOWS_LIVE_PAID_PROVIDER_STILL_BLOCKED"
+      - name: Windows scientific model release decision gate
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/decide_bearing_ml_application.py --out "$env:RUNNER_TEMP\ml_application_decision.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $decision = Get-Content "$env:RUNNER_TEMP\ml_application_decision.json" -Raw | ConvertFrom-Json
+          if ($decision.production_ml_activation_allowed -ne $false -or $decision.general_accuracy_measured -ne $false -or $decision.original_real_training_model_content_verified -ne $true) {
+            throw "Invalid ML model scientific release decision"
+          }
+          Write-Output "WINDOWS_ML_NO_GO_DEVELOPMENT_GATES_PASS"
+      - name: Cross-platform healthy compatibility blocks unchanged
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe scripts/audit_external_healthy_compatibility.py --out "$env:RUNNER_TEMP\healthy_readiness.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content "$env:RUNNER_TEMP\healthy_readiness.json" -Raw | ConvertFrom-Json
+          if ($report.new_healthy_bearings_validated -ne 0 -or $report.false_positive_rate_measured -ne $false) {
+            throw "falsely validated normal bearings"
+          }
+
+  chromium-existing-ui:
+    name: Chromium full P7.2 UI + attempted transfer warning and mocked agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing dependencies, browser and tests
+        run: |
+          python -m pip install -r requirements-ml.txt pytest httpx playwright
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium
+          sudo mkdir -p /mnt/data
+          sudo chown "$(id -u):$(id -g)" /mnt/data
+      - name: Regression on each existing screen and Stage6 connected user path
+        run: |
+          for test in \
+            tests/browser_smoke.py tests/browser_step1.py tests/browser_step2.py \
+            tests/browser_step3.py tests/browser_step4.py tests/browser_step5.py \
+            tests/browser_final_integration.py tests/browser_stage6_integrated.py; do
+            PYTHONPATH=. python "$test" || exit 1
+          done
+
+
+
+
+  real-original-paderborn-research-ml:
+    name: REAL K001 original MD5 RAR > 80 MAT > 12 features > frozen research ML score
+    runs-on: windows-2025
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install already declared science dependencies (no app packaging)
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-ml.txt httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download only original K001 archive into disposable runner temporary folder
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          & curl.exe --fail --location --retry 1 --connect-timeout 25 --max-time 650 --silent --show-error "https://zenodo.org/records/15845309/files/K001.rar?download=1" --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Item $archive).Length -lt 100000000) { throw "Original K001 archive too short" }
+      - name: Actual original archive MD5, complete 4x20 paired MATLAB, frozen model prediction
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          $result = Join-Path $env:RUNNER_TEMP "faultmate_k001_real_research_prediction.json"
+          $features = Join-Path $env:RUNNER_TEMP "faultmate_k001_80_original_features.json"
+          python scripts/run_experimental_paderborn_ml.py --archive $archive --bearing-id K001 --features-out $features --out $result
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $result -Raw | ConvertFrom-Json
+          if ($r.source_archive_verified_from_original_bytes_same_run -ne $true -or
+              $r.source_mat_files_actually_read_this_run -ne 80 -or
+              $r.research_input_source.unique_signal_pairs -ne 80 -or
+              $r.runtime_ml_model_approved -ne $false -or
+              $r.independent_heldout_healthy_specificity_measured -ne $false -or
+              $r.new_independent_test_bearing_claimed -ne $false) {
+            throw "Real original experiment provenance or research-only safety failed"
+          }
+          Write-Output "REAL_ORIGINAL_PADERBORN_K001_80_MAT_TO_FROZEN_ML_PASS"
+          Write-Output "REAL_RESEARCH_SCORE_$($r.experimental_damage_model_score)_PRED_$($r.experimental_predicted_label)_NOT_FRESH_TEST"
+      - name: REAL 80 MAT source features -> experimental research HTTP API -> identical frozen score
+        shell: pwsh
+        run: |
+          $features = Join-Path $env:RUNNER_TEMP "faultmate_k001_80_original_features.json"
+          $result = Join-Path $env:RUNNER_TEMP "faultmate_k001_real_research_prediction.json"
+          python scripts/check_real_ml_app_research.py --features $features --score $result
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "REAL_80_MAT_FROZEN_ML_LOCAL_API_ACTUALLY_SCORED_PASS"
+      - name: ACTUAL original K001 RAR direct local API upload to frozen 80MAT ML score
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "K001.rar"
+          $result = Join-Path $env:RUNNER_TEMP "faultmate_k001_real_research_prediction.json"
+          python scripts/check_real_rar_direct_local_api.py --archive $archive --prior-score $result
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "REAL_ORIGINAL_RAR_DIRECT_ONE_CLICK_ML_SCORE_VERIFIED"
+      - name: Real experimental prediction did not activate the production app
+        shell: pwsh
+        run: |
+          python -c "from faultmate.integration.ml import load_validated_model; assert load_validated_model() is None; print('ORIGINAL_ML_EXPERIMENT_COMPLETE_PRODUCTION_STILL_UNAPPROVED')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+
+  real-known-damaged-ki21-failure-replay:
+    name: REAL previously opened damaged KI21 original RAR -> app known false-negative safety check
+    runs-on: windows-2025
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing scientific dependencies and local HTTP test client only
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-ml.txt httpx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download only already-used original KI21 source RAR into ephemeral runner
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
+          & curl.exe --fail --location --retry 1 --connect-timeout 25 --max-time 750 --silent --show-error "https://zenodo.org/records/15845309/files/KI21.rar?download=1" --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Item $archive).Length -lt 100000000) { throw "Previously tested KI21 original source archive too short" }
+      - name: Reproduce actual previously known KI21 missed damaged bearing, never call it a new test
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
+          python scripts/check_known_ki21_real_failure.py --archive $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "REAL_KI21_HISTORICAL_FALSE_NEGATIVE_REPRODUCED_PRODUCTION_MODEL_STILL_OFF"
+      - name: Attribute frozen KI21 logit from genuine original RAR, no refit
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
+          $report = Join-Path $env:RUNNER_TEMP "ki21_frozen_feature_attribution.json"
+          python -m scripts.explain_known_ki21_frozen_model --archive $archive > $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $report -Raw | ConvertFrom-Json
+          if ($r.original_source_reauthenticated_this_run -ne $true -or
+              $r.source_mat_recordings -ne 80 -or
+              $r.bearing_id -ne "KI21" -or
+              $r.physical_truth_label -ne "damaged" -or
+              $r.prediction -ne "healthy" -or
+              $r.damage_model_score -ge 0.5 -or
+              $r.features_sorted_by_absolute_logit_contribution.Count -ne 12 -or
+              $r.new_independent_test -ne $false -or
+              $r.production_model_approved -ne $false -or
+              $r.safe_to_work -ne $false) {
+            throw "Actual KI21 attribution mismatched frozen source/model contract"
+          }
+          # Print only the frozen model's signed logit terms (not original
+          # waveforms, full feature vectors, new performance or causal claims).
+          # Individual contributions must sum with the intercept to the logit.
+          $terms = @($r.features_sorted_by_absolute_logit_contribution)
+          $sumTerms = ($terms | Measure-Object -Property signed_logit_contribution -Sum).Sum
+          $reconstructed = [double]$r.intercept + [double]$sumTerms
+          if ([math]::Abs($reconstructed - [double]$r.logit) -gt 0.00000001 -or
+              [math]::Abs([double]$r.damage_model_score - 0.45992558) -gt 0.00000002) {
+            throw "KI21 signed attribution terms do not explain the historical frozen prediction"
+          }
+          Write-Output ("KI21_FROZEN_ATTRIBUTION_INTERCEPT={0:N6} LOGIT={1:N6} SCORE={2:N8}" -f [double]$r.intercept, [double]$r.logit, [double]$r.damage_model_score)
+          foreach ($term in $terms) {
+            Write-Output ("KI21_FROZEN_FEATURE_CONTRIBUTION name={0} signed_logit={1:N6}" -f [string]$term.feature, [double]$term.signed_logit_contribution)
+          }
+          Write-Output "ATTRIBUTION_IS_FROZEN_MODEL_ARITHMETIC_NOT_PHYSICAL_CAUSE_NOT_NEW_EVALUATION"
+          Write-Output "REAL_KI21_ORIGINAL_80MAT_FROZEN_12_FEATURE_LOGIT_ATTRIBUTION_PASS_NO_NEW_TEST"
+      - name: Download PINNED ten original development bearing feature/audit evidence only
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $features = Join-Path $env:RUNNER_TEMP "faultmate_dev_features"
+          $audits = Join-Path $env:RUNNER_TEMP "faultmate_dev_audits"
+          $baseline = Join-Path $env:RUNNER_TEMP "faultmate_dev_baseline"
+          New-Item -Force -ItemType Directory $features, $audits, $baseline | Out-Null
+          & gh run download 41965647928 --repo $env:GITHUB_REPOSITORY --name "stage4-real-12-bearing-unitless-evaluation-unapproved" --dir $baseline
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($bearing in @("K001","K002","K003","K004","K005","KA04","KA16","KB23","KI04","KI16")) {
+            & gh run download 41965647928 --repo $env:GITHUB_REPOSITORY --name "stage4-unitless-bearing-$bearing" --dir $features
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & gh run download 41957475830 --repo $env:GITHUB_REPOSITORY --name "stage3-bearing-$bearing" --dir $audits
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if ((@(Get-ChildItem $features -File -Filter "*.json")).Count -ne 10 -or
+              (@(Get-ChildItem $audits -File -Filter "*.json")).Count -ne 10 -or
+              -not (Test-Path (Join-Path $baseline "real_unitless_evaluation.json")) -or
+              (Test-Path (Join-Path $features "K006.json")) -or
+              (Test-Path (Join-Path $features "KI18.json")) -or
+              (Test-Path (Join-Path $features "KI21.json"))) {
+            throw "Missing/forbidden original development evidence artifact"
+          }
+          Write-Output "EXACT_TEN_PINNED_DEVELOPMENT_FEATURE_ARTIFACTS_FETCHED_AWAITING_SHA_REVERIFICATION"
+      - name: Original KI21 four-condition pooled-median sensitivity (research only)
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
+          $report = Join-Path $env:RUNNER_TEMP "ki21_four_condition_diagnostic.json"
+          $features = Join-Path $env:RUNNER_TEMP "faultmate_dev_features"
+          $audits = Join-Path $env:RUNNER_TEMP "faultmate_dev_audits"
+          $baseline = Join-Path $env:RUNNER_TEMP "faultmate_dev_baseline"
+          python -m scripts.audit_known_ki21_conditions --archive $archive --dev-features $features --dev-audits $audits --dev-baseline (Join-Path $baseline "real_unitless_evaluation.json") > $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $report -Raw | ConvertFrom-Json
+          $rows = @($r.four_operating_conditions)
+          $verifiedTotal = ($rows | Measure-Object -Property original_mat_count -Sum).Sum
+          $uniqueTotal = ($rows | Measure-Object -Property unique_signal_pairs -Sum).Sum
+          if ($r.official_original_archive_md5_and_80_mat_verified_this_run -ne $true -or
+              $r.bearing_id -ne "KI21" -or $r.physical_research_truth -ne "damaged" -or
+              $r.source_mat_recordings -ne 80 -or $verifiedTotal -ne 80 -or
+              $rows.Count -ne 4 -or $uniqueTotal -ne $r.pooled_source_unique_signal_pairs -or
+              $r.original_80_record_pooled_median_reconstructed_exactly -ne $true -or
+              [math]::Abs([double]$r.frozen_pooled_score - 0.45992558) -gt 0.00000002 -or
+              $r.frozen_pooled_label -ne "healthy" -or
+              $r.condition_only_model_scores_outside_original_training_contract -ne $true -or
+              $r.previously_opened_ki21_not_new_independent_test -ne $true -or
+              $r.model_refitted_or_threshold_modified -ne $false -or
+              $r.production_model_approved -ne $false -or $r.safe_to_work -ne $false) {
+            throw "KI21 condition audit violates source, frozen input or scientific gates"
+          }
+          Write-Output ("KI21_FROZEN_POOLED score={0:N8} logit={1:N6} vibration={2:N6} current={3:N6}" -f [double]$r.frozen_pooled_score, [double]$r.frozen_pooled_logit, [double]$r.pooled_vibration_logit_contribution, [double]$r.pooled_current_logit_contribution)
+          foreach ($row in $rows) {
+            if ($row.not_a_validated_per_condition_prediction -ne $true -or
+                $row.original_mat_count -ne 20 -or $row.unique_signal_pairs -lt 1) {
+              throw "Condition-only score misrepresented as validated prediction"
+            }
+            Write-Output ("KI21_CONDITION_DIAGNOSTIC condition={0} unique={1} score={2:N8} logit={3:N6} vib={4:N6} cur={5:N6} change_vs_pooled={6:N6} UNVALIDATED_SUBGROUP" -f $row.condition, $row.unique_signal_pairs, [double]$row.diagnostic_condition_median_damage_score, [double]$row.diagnostic_condition_median_logit, [double]$row.vibration_logit_contribution, [double]$row.current_logit_contribution, [double]$row.logit_difference_from_frozen_pooled)
+            foreach ($feature in @($row.largest_three_feature_contribution_differences)) {
+              Write-Output ("KI21_CONDITION_SHIFT condition={0} name={1} delta_logit={2:N6}" -f $row.condition, $feature.feature, [double]$feature.logit_contribution_change_vs_pooled)
+            }
+          }
+          $scaler = $r.current_scaler_diagnostic
+          $conditionGroups = @($scaler.condition_rows)
+          if ($scaler.pooled_input_reconstructed_exactly -ne $true -or
+              $scaler.original_mat_recordings -ne 80 -or
+              $scaler.source_unique_signal_pairs -ne 80 -or
+              $scaler.training_reference_scope -ne "10_previously_used_physical_bearing_pooled_medians" -or
+              $scaler.condition_record_distribution_not_equivalent_to_training_distribution -ne $true -or
+              $scaler.three_std_flag_is_descriptive_not_calibrated_outlier_threshold -ne $true -or
+              $scaler.model_feature_attribution_not_physical_sensor_diagnosis -ne $true -or
+              $scaler.new_independent_test -ne $false -or
+              $scaler.frozen_model_changed -ne $false -or
+              $scaler.frozen_threshold_changed -ne $false -or
+              $scaler.production_model_approved -ne $false -or
+              $scaler.safe_to_work -ne $false -or
+              $conditionGroups.Count -ne 4) {
+            throw "Current sensor scaler audit lacks provenance or safety gates"
+          }
+          foreach ($group in $conditionGroups) {
+            $matching = @($rows | Where-Object { $_.condition -eq $group.condition })
+            $features = @($group.features)
+            if ($matching.Count -ne 1 -or $group.original_mat_count -ne 20 -or
+                $group.unique_signal_pairs -ne $matching[0].unique_signal_pairs -or
+                $features.Count -ne 6 -or
+                [math]::Abs([double]$group.sum_current_logit_shift_vs_pooled -
+                  ([double]$matching[0].current_logit_contribution - [double]$r.pooled_current_logit_contribution)) -gt 0.00000001) {
+              throw "Current scaler logit shift disagrees with original condition audit"
+            }
+            foreach ($f in $features) {
+              if ($f.reference_is_training_bearing_level_median_scaler -ne $true -or
+                  $f.frozen_training_bearing_scaler_scale -le 0 -or
+                  $f.feature -notlike "current_*") {
+                throw "Incorrect current feature scaling reference"
+              }
+              Write-Output ("KI21_CURRENT_SCALER_DIAGNOSTIC condition={0} feature={1} median_z_vs_bearing_scaler={2:N4} iqr_in_scaler_units={3:N4} delta_logit_vs_pooled={4:N4} UNCALIBRATED" -f $group.condition, $f.feature, [double]$f.condition_median_z_vs_training_bearing_scaler, [double]$f.condition_iqr_in_training_scaler_units, [double]$f.logit_contribution_shift_vs_pooled)
+            }
+          }
+          $dev = $r.development_only_current_reference
+          $refs = @($dev.four_conditions)
+          if ($dev.source_dev_original_sha_verification_is_precondition -ne $true -or
+              $dev.replay_ki21_original_rar_in_same_run_is_precondition -ne $true -or
+              $dev.dev_physical_bearing_count -ne 10 -or
+              $dev.dev_original_unique_feature_records -ne 796 -or
+              $dev.ki21_original_mat_recordings -ne 80 -or
+              $dev.ki21_not_used_for_model_training_or_feature_selection -ne $true -or
+              $dev.new_independent_healthy_cohort_measured -ne $false -or
+              $dev.accuracy_or_specificity_estimated -ne $false -or
+              $dev.model_refitted_or_threshold_changed -ne $false -or
+              $dev.production_ml_activation_allowed -ne $false -or
+              $refs.Count -ne 4) {
+            throw "DEV comparison leakage or fabricated validation"
+          }
+          foreach ($c in $refs) {
+            $features = @($c.features)
+            if ($c.healthy_dev -ne 5 -or $c.damaged_dev -ne 5 -or
+                $c.development_physical_bearings -ne 10 -or
+                $features.Count -ne 6) {
+              throw "DEV comparison physical bearings/condition references invalid"
+            }
+            foreach ($f in $features) {
+              if ($f.development_healthy_physical_bearings -ne 5 -or
+                  $f.development_damaged_physical_bearings -ne 5 -or
+                  $f.not_an_independent_accuracy_or_calibrated_outlier_test -ne $true) {
+                throw "False independent reference/specificity claim"
+              }
+              Write-Output ("KI21_VS_10_DEV_CONDITION condition={0} feature={1} ki21={2:N7} healthy_dev_median={3:N7} damaged_dev_median={4:N7} dev_min={5:N7} dev_max={6:N7} below_dev_range={7} above_dev_range={8} REUSED_DEV_DESCRIPTIVE_ONLY" -f $c.condition, $f.feature, [double]$f.ki21_condition_median_unitless, [double]$f.healthy_dev_condition_medians_median, [double]$f.damaged_dev_condition_medians_median, [double]$f.all_dev_condition_medians_min, [double]$f.all_dev_condition_medians_max, $f.ki21_below_all_dev_observed_range, $f.ki21_above_all_dev_observed_range)
+              $spread = $f.within_bearing_trial_dispersion
+              if ($spread.trials_not_independent_bearings -ne $true -or
+                  $spread.not_an_independent_repeat_extraction_test -ne $true -or
+                  $spread.not_a_calibrated_variance_or_sensor_stability_test -ne $true -or
+                  $spread.ki21_original_trials -ne 20 -or
+                  $spread.dev_bearings -ne 10 -or
+                  [double]$spread.ki21_trial_iqr_unitless -lt 0 -or
+                  [double]$spread.dev_ten_bearing_trial_iqr_min -lt 0 -or
+                  [double]$spread.dev_ten_bearing_trial_iqr_max -lt [double]$spread.dev_ten_bearing_trial_iqr_min) {
+                throw "Invalid per-bearing spread evidence or false independent test claim"
+              }
+              Write-Output ("KI21_DEV_REPEAT_TRIAL_IQR condition={0} feature={1} ki21={2:N7} healthy_dev_median={3:N7} damaged_dev_median={4:N7} dev_min={5:N7} dev_max={6:N7} outside_above={7} outside_below={8} NOT_INDEPENDENT_EXTRACTOR_REPLAY" -f $c.condition, $f.feature, [double]$spread.ki21_trial_iqr_unitless, [double]$spread.healthy_dev_five_bearing_trial_iqr_median, [double]$spread.damaged_dev_five_bearing_trial_iqr_median, [double]$spread.dev_ten_bearing_trial_iqr_min, [double]$spread.dev_ten_bearing_trial_iqr_max, $spread.ki21_trial_iqr_above_all_ten_dev_bearing_iqr, $spread.ki21_trial_iqr_below_all_ten_dev_bearing_iqr)
+            }
+          }
+          Write-Output "TEN_DEV_PHYSICAL_BEARING_REPEAT_TRIAL_SPREAD_DESCRIPTIVE_ONLY_PASS"
+          Write-Output "KI21_VS_10_SHA_VERIFIED_DEV_BEARINGS_NOT_NEW_ACCURACY_NOT_MODEL_TUNING_PASS"
+          Write-Output "KI21_CURRENT_TRAINING_SCALER_DESCRIPTIVE_ONLY_NOT_ANOMALY_OR_RUNTIME_APPROVAL"
+          Write-Output "KI21_CONDITIONS_80_MAT_RECHECK_PASS_NOT_NEW_EVAL_NOT_VALIDATED_CONDITION_MODEL"
+      - name: Original record safe and source/license untouched
+        shell: pwsh
+        run: |
+          python -c "from faultmate.integration.ml import load_validated_model; assert load_validated_model() is None; print('KI21_SOURCE_REPLAY_NO_RUNTIME_MODEL_ACTIVATION')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -6,11 +6,23 @@ separately by the Antigravity agent with an explicit, per-request user action.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
 from pydantic import BaseModel, ConfigDict
 from faultmate.diagnostics.engine import TriageRequest, triage
 from faultmate.knowledge.repository import load_catalog
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
+
+
+def agent_context_wire(context: dict) -> str:
+    """Canonical exact JSON text used in BOTH preview digest and outbound body."""
+    return json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def agent_context_sha256(context: dict) -> str:
+    return hashlib.sha256(agent_context_wire(context).encode("utf-8")).hexdigest()
 
 
 class ContextPreviewRequest(BaseModel):
@@ -76,6 +88,7 @@ def evidence_preview(request: ContextPreviewRequest) -> dict:
         "stored": False,
         "notice": assessment["notice"],
         "context": None,
+        "context_sha256": None,
     }
     if state == "safety_hold":
         # Safety hold never includes diagnostic candidates, observed values,
@@ -128,4 +141,5 @@ def evidence_preview(request: ContextPreviewRequest) -> dict:
             "설비 제어", "인터록 우회", "무단 재기동", "고장 확정", "작업 안전 허가"
         ],
     }
+    result["context_sha256"] = agent_context_sha256(result["context"])
     return result

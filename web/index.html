@@ -79,6 +79,24 @@
         <p id="ml-feedback" class="small-note" role="status"></p>
         <article id="ml-result" class="triage-result" aria-live="polite"></article>
       </div>
+      <div id="ml-research-controls" class="integration-extra">
+        <h3>Paderborn 베어링 실험용 ML · 미승인</h3>
+        <p class="small-note">원본 Paderborn 베어링 RAR을 선택하면 로컬 서버가 직접 원본 MD5·압축 무결성·진동과 전류 신호 80회·특징 12개를 검증하고, 이미 학습된 모델로 실험 점수를 계산합니다. 외부 AI 서버로 전송하지 않습니다.</p>
+        <label for="raw-rar-upload">원본 베어링 RAR (예: K001.rar, 최대 768MB)</label>
+        <input type="file" id="raw-rar-upload" accept=".rar,application/vnd.rar,application/x-rar-compressed"/>
+        <div class="form-actions"><button type="button" id="raw-rar-run" disabled>원본 RAR 자동 분석 · 연구용 ML</button></div>
+        <p id="raw-rar-feedback" class="small-note" role="status">원본 RAR을 선택하세요. 원본 검증과 모델 계산에 시간이 걸릴 수 있습니다.</p>
+        <article id="raw-rar-result" class="triage-result" aria-live="polite"></article>
+        <details class="optional-fields" id="research-json-advanced"><summary>기존 80회 특징 JSON 분석 (고급 · 원본 재검증 없음)</summary>
+        <p class="small-note">JSON만 업로드하면 원본 측정파일의 진위는 재확인할 수 없습니다. 아래 결과 역시 현장 고장 확정에 사용할 수 없습니다.</p>
+        <label for="research-upload">원본에서 추출한 80회 특징 보고서 (.json)</label>
+        <input type="file" id="research-upload" accept=".json,application/json"/>
+        <div class="form-actions"><button type="button" id="research-run" disabled>실험용 ML 점수 계산</button></div>
+        <p id="research-feedback" class="small-note" role="status">연구용 특징 JSON 선택 후 실행할 수 있습니다. 기존 CSV ML 기능과 별도입니다.</p>
+        <article id="research-result" class="triage-result" aria-live="polite"></article>
+        </details>
+        <p class="small-note">두 분석 방식 모두 실험용 모델이며 독립 정상 베어링 오경보율 검증이 완료되지 않았습니다. 점수는 설비 고장 확률이나 정비 허가가 아닙니다.</p>
+      </div>
     </details>
     <details class="panel expand-panel" id="knowledge-panel"><summary class="expand-summary"><span><b>근거 자료실</b><small>설비별 고장 사례 7개 · 제조사 출처</small></span><span class="summary-hint">필요할 때 펼치기</span></summary>
       <div class="caution">매뉴얼의 적용 모델은 다를 수 있습니다. 안전 인터록 우회·무단 재가동·내부 접촉 점검을 지시하지 않습니다.</div>

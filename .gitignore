@@ -7,3 +7,31 @@ web/node_modules/
 
 /models/evaluation/
 *.secrets
+.venv-ml/
+/data/raw/
+/data/converted/
+*.rar
+*.mat
+/models/bearing_validated.json
+/models/review*.json
+/data/provenance/
+/data/evidence/
+/data/raw_audit_reports/
+/data/cohort_raw_audit.json
+/audit-reports/
+/cohort_raw_audit.json
+.env.*
+!.env.example
+*.log
+.coverage
+htmlcov/
+/test-results/
+/playwright-report/
+/screenshots/
+/artifacts/
+*.exe
+*.zip
+*.7z
+
+# Notes: the pinned official 12-bearing checksum catalog in docs/ is source evidence
+# and must remain tracked; these ignores apply to derived/local-only files.

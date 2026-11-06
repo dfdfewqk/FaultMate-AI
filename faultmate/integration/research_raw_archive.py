@@ -1,0 +1,234 @@
+"""One-click LOCAL original RAR -> 80 MAT -> frozen research-only ML.
+
+No server-side user-supplied file paths, no global source storage, no paid API.
+Uploads stream to an exclusive temporary local file under an explicit cap;
+source MD5, full archive inventory and the 80 original vibration/current MAT
+recordings are checked AGAIN in this very request by the existing extractor.
+
+The archived source remains CC BY-NC 4.0 and the original fitted ML is
+NOT an approved production/field model. The HTTP response contains only
+non-sensitive research metadata, not raw signals or full feature vectors.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+import shutil
+import tempfile
+import threading
+from pathlib import Path
+
+from fastapi import HTTPException, Request
+from scripts.audit_paderborn_assets import CATALOG, validate_catalog
+
+MIN_ORIGINAL_RAR_BYTES = 100_000_000
+MAX_ORIGINAL_RAR_BYTES = 768 * 1024 * 1024
+MIN_EXTRA_DISK_BYTES = 256 * 1024 * 1024
+READABLE_BEARING = re.compile(r"^[A-Z]{1,2}\d{2,3}$")
+# Only one resource-intensive extraction at a time. No global job queue or
+# background retained files; releases on success, validation failure, or error.
+_RESEARCH_BUSY = threading.BoundedSemaphore(value=1)
+
+
+def validate_bearing_id(raw_id: str | None) -> str:
+    if not isinstance(raw_id, str) or not READABLE_BEARING.fullmatch(raw_id):
+        raise HTTPException(status_code=422, detail="supported_original_bearing_id_required")
+    approved_dev = {a["id"] for a in validate_catalog(
+        json.loads(CATALOG.read_text(encoding="utf-8"))
+    )}
+    if raw_id not in approved_dev:
+        # This original source subset was already tested as damaged-only
+        # and is NOT fresh/blind independent data on any subsequent replay.
+        from scripts.extract_unseen_paderborn_damaged import (
+            KNOWN_NEW_MD5, verified_manifest,
+        )
+        if raw_id not in KNOWN_NEW_MD5:
+            raise HTTPException(
+                status_code=422,
+                detail="only_pinned_original_paderborn_dev_or_previously_tested_damaged_supported",
+            )
+        verified_manifest()
+    return raw_id
+
+
+def verify_rar_request(request: Request) -> tuple[str, int | None]:
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if content_type not in ("application/octet-stream", "application/vnd.rar",
+                            "application/x-rar-compressed"):
+        raise HTTPException(status_code=415, detail="original_rar_binary_required")
+    asset = validate_bearing_id(request.headers.get("x-faultmate-bearing-id"))
+    header_size = request.headers.get("content-length")
+    if header_size is None:
+        return asset, None
+    try:
+        length = int(header_size)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="invalid_archive_content_length") from exc
+    if not 0 < length <= MAX_ORIGINAL_RAR_BYTES:
+        raise HTTPException(
+            status_code=413 if length > MAX_ORIGINAL_RAR_BYTES else 400,
+            detail="original_rar_upload_length_invalid")
+    return asset, length
+
+
+def _research_score(archive: Path, asset: str) -> dict:
+    # Runtime imports/load performed only in explicit research route. Uses
+    # exactly the already established 12-feature scientific model and 0.5 cut.
+    sevenzip = shutil.which("7z") or shutil.which("7zz")
+    if not sevenzip:
+        from sys import platform
+        if platform == "win32":
+            candidate = Path(r"C:\Program Files\7-Zip\7z.exe")
+            if candidate.is_file():
+                sevenzip = str(candidate)
+    if not sevenzip:
+        return {
+            "status": "unavailable", "research_inference_performed": False,
+            "confirmed_fault": False, "safe_to_work": False,
+            "message": "원본 RAR을 읽는 7-Zip 실행 도구가 없어 분석을 시작하지 못했습니다.",
+        }
+    from scripts.extract_unseen_paderborn_damaged import KNOWN_NEW_MD5
+    is_historical_damaged = asset in KNOWN_NEW_MD5
+    if is_historical_damaged:
+        from scripts.replay_prior_damaged_bearing import run_prior_damaged_archive
+        score = run_prior_damaged_archive(archive, asset, sevenzip=sevenzip)
+        signal_count = score["source_mat_recordings"]
+        unique_count = score["source_unique_signal_pairs"]
+        duplicate_count = score["duplicates_excluded"]
+        known_truth_label = "damaged"
+        missed_damage = score["historical_false_negative"]
+    else:
+        from scripts.run_experimental_paderborn_ml import run_archive
+        score = run_archive(archive, asset, sevenzip=sevenzip)
+        signal_count = score["research_input_source"]["source_records"]
+        unique_count = score["research_input_source"]["unique_signal_pairs"]
+        duplicate_count = score["research_input_source"]["duplicates_excluded"]
+        # Source catalog labels are research labels, not equipment safety.
+        catalog = {row["id"]: row for row in validate_catalog(
+            json.loads(CATALOG.read_text(encoding="utf-8"))
+        )}
+        known_truth_label = catalog[asset]["label"]
+        # Previously used development/holdout examples can also be misclassified.
+        # Do not suppress a known physical-damage versus model-healthy conflict.
+        missed_damage = (known_truth_label == "damaged" and
+                         score["experimental_predicted_label"] == "healthy")
+    return {
+        "status": "experimental_unapproved",
+        "research_inference_performed": True,
+        "original_rar_md5_verified_in_this_request": True,
+        "source_archive_reverified_from_original_bytes_this_http_request": True,
+        "source_mat_files_actually_read_this_run": signal_count,
+        "four_paderborn_conditions_verified": True,
+        "bearing_id": asset,
+        "source_original_recordings": signal_count,
+        "source_unique_signal_pairs": unique_count,
+        "duplicates_excluded": duplicate_count,
+        "frozen_model_sha256": score["frozen_model_sha256"],
+        "experimental_predicted_label": score["experimental_predicted_label"],
+        "experimental_damage_model_score": score["experimental_damage_model_score"],
+        "source_known_research_truth_label": known_truth_label,
+        "previously_opened_damaged_test_replay_not_new_evaluation": is_historical_damaged,
+        "historical_known_damaged_false_negative": missed_damage,
+        "old_training_bearing_may_have_been_used": not is_historical_damaged,
+        "new_independent_healthy_specificity_measured": False,
+        "overall_field_accuracy_measured": False,
+        "physical_si_units_verified": False,
+        "dataset_license": "CC BY-NC 4.0",
+        "model_approved_for_runtime": False,
+        "production_bearing_model_activated": False,
+        "confirmed_fault": False,
+        "safe_to_work": False,
+        "maintenance_action_authorized": False,
+        "external_ai_transfer": False,
+        "message": (
+            "주의: 기존 연구에서 손상으로 확인된 베어링을 모델이 정상 쪽으로 "
+            "놓친 미탐 사례가 다시 나타났습니다. 절대 안전하다는 판단이 아닙니다."
+            if missed_damage else
+            "원본 Paderborn RAR 및 80개 센서 측정파일을 실제 검증해 기존 연구 "
+            "모델로 계산했습니다. 이미 학습·평가에 사용한 베어링이며 새 독립 "
+            "시험이 아닙니다. 현장 고장 확률이나 정비 허가가 아닙니다."
+        ),
+    }
+
+async def _drain_cancelled_research_worker(worker: asyncio.Task) -> None:
+    """Hold temporary RAR and single-flight lock until the extraction exits.
+
+    A browser can disconnect and cancel an ASGI task more than once. After
+    the first cancellation, later cancellations must not let TemporaryDirectory
+    delete the original RAR while the background 7z thread is still reading.
+    This helper neither cancels the worker nor retries or starts new work.
+    """
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            # A second disconnect/shutdown cancellation must not release
+            # the only source file or the semaphore while extraction runs.
+            continue
+        except Exception:
+            # Errors from the worker still mean it has finished; the original
+            # request remains cancelled rather than becoming a false result.
+            if not worker.done():
+                raise
+    if not worker.cancelled():
+        # Retrieve an eventual worker failure to avoid an unhandled exception
+        # warning, but never expose a path, model result or original signal.
+        worker.exception()
+
+
+async def inspect_original_rar(request: Request) -> dict:
+    """HTTP-only local stream; no filename/absolute path supplied by user."""
+    asset, declared = verify_rar_request(request)
+    if not _RESEARCH_BUSY.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="research_archive_scoring_already_running")
+    try:
+        with tempfile.TemporaryDirectory(prefix="faultmate-original-rar-only-") as tmp:
+            root = Path(tmp)
+            # Early disk guard. Original archive itself is retained only in
+            # this temporary folder and unlinked when request exits.
+            free = shutil.disk_usage(root).free
+            if free < MIN_EXTRA_DISK_BYTES + (declared or MAX_ORIGINAL_RAR_BYTES):
+                raise HTTPException(status_code=507, detail="insufficient_temporary_disk_for_original_rar")
+            archive = root / f"{asset}.rar"
+            size = 0
+            with archive.open("xb") as out:
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > MAX_ORIGINAL_RAR_BYTES:
+                        raise HTTPException(status_code=413, detail="original_rar_exceeds_streaming_limit")
+                    if chunk:
+                        out.write(chunk)
+            if not MIN_ORIGINAL_RAR_BYTES <= size <= MAX_ORIGINAL_RAR_BYTES:
+                raise HTTPException(status_code=422, detail="original_rar_source_size_invalid")
+            if declared is not None and declared != size:
+                raise HTTPException(status_code=400, detail="original_rar_content_length_mismatch")
+            # Use worker thread: browser and normal rule-based endpoints remain
+            # responsive during expensive original MAT processing.
+            try:
+                # A browser abort/connection loss must NOT remove the temp RAR
+                # and release the exclusive lock while the 7z thread still
+                # reads it. Finish the read-only local check before cleanup.
+                worker = asyncio.create_task(
+                    asyncio.to_thread(_research_score, archive, asset))
+                try:
+                    return await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    await _drain_cancelled_research_worker(worker)
+                    raise
+            except (OSError, ValueError, TypeError, KeyError, RuntimeError,
+                    ImportError, ModuleNotFoundError):
+                # Do not echo temporary path, source bytes, archive exception
+                # internals, or the original filename into browser/log output.
+                return {
+                    "status": "rejected_source",
+                    "research_inference_performed": False,
+                    "original_rar_md5_verified_in_this_request": False,
+                    "confirmed_fault": False, "safe_to_work": False,
+                    "message": (
+                        "원저자 등록 MD5·압축 무결성·센서 채널·4조건×20회 또는 "
+                        "고정 모델 검증에 실패했습니다. 예측하지 않았습니다."
+                    ),
+                }
+    finally:
+        _RESEARCH_BUSY.release()

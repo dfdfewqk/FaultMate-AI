@@ -86,8 +86,44 @@ def load_validated_model() -> dict | None:
             return None
         if (model.get('status') != 'validated' or model.get('feature_names') != list(FEATURES)
             or model.get('classes') != list(EXPECTED_LABELS)
-            or not model.get('data_sha256') or not model.get('heldout_evaluation')
-            or not isinstance(model.get('source_id'),str) or not model['source_id']):
+            or model.get('scope') != 'experimental_bearing_feature_windows_only'
+            or model.get('source_id') != 'paderborn-bearing-datacenter'
+            or model.get('license') != 'CC BY-NC 4.0'
+            or not isinstance(model.get('data_sha256'), str)
+            or len(model['data_sha256']) != 64
+            or not model.get('heldout_evaluation')):
+            return None
+        # Prevent an unreviewed evaluated JSON from becoming an active model
+        # merely because someone manually changed its status field.
+        review = model.get('review_record')
+        checks = ('unit_calibration_verified', 'label_provenance_verified',
+                  'independent_assets_verified', 'heldout_errors_reviewed',
+                  'noncommercial_use_only')
+        if (not isinstance(review, dict)
+            or review.get('decision') != 'approved_for_experimental_use'
+            or review.get('data_sha256') != model['data_sha256']
+            or not isinstance(review.get('evaluated_sha256'), str)
+            or len(review['evaluated_sha256']) != 64
+            or not isinstance(review.get('reviewed_by'), str)
+            or len(review['reviewed_by'].strip()) < 2
+            or not all(review.get(key) is True for key in checks)):
+            return None
+        provenance = model.get('provenance_check')
+        if (not isinstance(provenance, dict)
+            or provenance.get('source_verified') is not True
+            or provenance.get('cohort_raw_audit_complete') is not True
+            or provenance.get('human_calibration_review_present') is not True
+            or any(not isinstance(provenance.get(key), str) or len(provenance[key]) != 64
+                   or review.get(review_key) != provenance[key]
+                   for key, review_key in (
+                       ('source_audit_sha256', 'source_audit_sha256'),
+                       ('review_sha256', 'calibration_review_sha256'),
+                       ('feature_ledger_sha256', 'feature_ledger_sha256')))):
+            return None
+        evaluation = model['heldout_evaluation']
+        if (not isinstance(evaluation, dict)
+            or not isinstance(evaluation.get('heldout_bearing_confusion_matrix'), list)
+            or not isinstance(evaluation.get('heldout_bearing_macro_f1'), (float, int))):
             return None
         for key in ('mean','std','coef'):
             if len(model.get(key,[])) != len(FEATURES) or not all(isinstance(x,(float,int)) and math.isfinite(x) for x in model[key]):

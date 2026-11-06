@@ -1,0 +1,28 @@
+{
+  "schema": "faultmate_prospective_independent_physical_bearing_plan_draft_v1",
+  "status": "draft_before_new_source_not_preregistered",
+  "frozen_research_model_sha256": "84a7c059fa769d1b0e2bd0075ecba92bcd06ae24acf961e0ea2120d9d44a0ab0",
+  "preexisting_experiment_results_seen": true,
+  "never_reuse_historical_bearings_as_new_test": true,
+  "proposed_source_id": null,
+  "source_license_for_proposed_use_verified": false,
+  "independent_physical_healthy_bearing_count_verified": 0,
+  "independent_physical_damaged_bearing_count_verified": 0,
+  "planned_minimum_healthy_bearings_before_data": null,
+  "planned_minimum_damaged_bearings_before_data": null,
+  "primary_bearing_level_metric_frozen_before_data": null,
+  "confidence_interval_method_frozen_before_data": null,
+  "minimum_acceptable_result_frozen_before_data": null,
+  "four_official_conditions_20_mat_each_bearing_verified": false,
+  "paired_64000hz_vibration_and_motor_current_original_signals_verified": false,
+  "raw_source_archive_and_signal_sha256_verified": false,
+  "zero_reuse_of_previously_opened_physical_bearings_and_signal_hashes_verified": false,
+  "protocol_committed_prior_to_any_new_test_source": false,
+  "prospective_test_approved_to_run": false,
+  "physical_asset_proposals": [],
+  "source_authority": [
+    "https://mb.uni-paderborn.de/en/kat/research/bearing-datacenter/data-sets-and-download",
+    "https://zenodo.org/records/15845309"
+  ],
+  "interpretation": "Draft readiness record, no new original bearing source identified or accessed, no new model predictions, no new sensitivity/specificity/FPR claim, no production model activation."
+}

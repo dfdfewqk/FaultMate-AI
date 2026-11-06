@@ -1,0 +1,90 @@
+name: Stage 3 official 12 Paderborn archives - full 960 raw recording audit
+on:
+  push:
+    branches:
+      - work/faultmate-cohort-12-raw-audit-20261105
+    paths:
+      - .github/workflows/official-paderborn-12-full-audit.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: faultmate-stage3-source-audit
+  cancel-in-progress: false
+
+jobs:
+  audit-bearings:
+    name: Verify source + 80 raw recordings (${{ matrix.bearing }})
+    runs-on: windows-2025
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        bearing: [K001, K002, K003, K004, K005, K006, KA04, KA16, KB23, KI04, KI16, KI18]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only scientific MAT reader dependencies
+        shell: pwsh
+        run: |
+          python -m pip install numpy scipy
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download original mirrored RAR into isolated runner temporary directory
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP '${{ matrix.bearing }}.rar'
+          $url = 'https://zenodo.org/records/15845309/files/${{ matrix.bearing }}.rar?download=1'
+          & curl.exe --fail --location --retry 2 --connect-timeout 25 --max-time 600 --silent --show-error $url --output $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Item $archive).Length -lt 100000000) { throw 'Incomplete official RAR download' }
+      - name: Full official MD5, 7-Zip and 4 x 20 MATLAB sensor recordings
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path audit-reports | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP '${{ matrix.bearing }}.rar'
+          $reportPath = 'audit-reports/${{ matrix.bearing }}.json'
+          python scripts/audit_paderborn_raw_recordings.py --archive $archive --bearing-id '${{ matrix.bearing }}' --all-recordings --out $reportPath > $null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+          if ($report.source_md5_verified -ne $true -or $report.inspected_recordings -ne 80) { throw 'Source check or full 80-trial coverage incomplete' }
+          if ($report.archive_inventory_verified -ne '80_mat_files_across_4_conditions') { throw 'Archive inventory mismatch' }
+          if ($report.raw_units_verified -ne $false -or $report.approved_for_training -ne $false) { throw 'Unsafe physical-unit or ML approval claim' }
+          Write-Output "RAW_SOURCE_AUDIT_OK: ${{ matrix.bearing }} 80 recordings; duplicate count $($report.duplicate_raw_recordings.Count); SI units NOT VERIFIED"
+      - name: Preserve JSON evidence only (no raw files, no binaries)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage3-bearing-${{ matrix.bearing }}
+          path: audit-reports/${{ matrix.bearing }}.json
+          retention-days: 7
+          if-no-files-found: error
+
+  combine:
+    name: Cross-bearing duplicates, labels, full-cohort evidence and stop gate
+    needs: audit-bearings
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: stage3-bearing-*
+          path: audit-reports
+          merge-multiple: true
+      - name: Recompute SHA cross-asset consistency; require all 960 recordings
+        run: |
+          python scripts/combine_paderborn_raw_audits.py --reports-dir audit-reports --out cohort_raw_audit.json > /dev/null
+          python -c "import json; r=json.load(open('cohort_raw_audit.json', encoding='utf-8')); assert r['cohort_raw_audit_complete'] is True, r; assert r['verified_independent_bearings']==12; assert r['fully_audited_bearings']==12; assert r['inspected_recordings']==960; assert r['fully_audited_by_label']=={'healthy':6,'damaged':6}; assert r['training_permitted'] is False; assert r['physical_units_verified'] is False; print('FULL COHORT RAW AUDIT PASS - 12 physical bearings, 960 MAT, ML STILL BLOCKED')"
+      - name: Keep full-cohort summary JSON only
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage3-full-cohort-raw-summary
+          path: cohort_raw_audit.json
+          retention-days: 7
+          if-no-files-found: error
