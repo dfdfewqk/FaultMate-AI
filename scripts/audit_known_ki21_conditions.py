@@ -148,7 +148,7 @@ def analyze_original_ki21_conditions(archive: Path, *, sevenzip: str) -> dict:
         or abs(reference["experimental_damage_model_score"] -
                result["frozen_pooled_score"]) > 0.000000011
         or reference["historical_false_negative"] is not True
-        or result["pooled_source_unique_signal_pairs"] != info["source_unique_signal_pairs"]):
+        or result["pooled_source_unique_signal_pairs"] != info["unique_signal_pairs"]):
         raise ValueError("ki21_historical_80_record_reference_mismatch")
     return {
         "status": "known_ki21_condition_aggregation_diagnostic_only",
