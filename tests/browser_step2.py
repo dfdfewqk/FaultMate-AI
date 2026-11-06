@@ -74,8 +74,11 @@ async def run():
         await page.locator('#triage-hazard').select_option('unknown')
         assert '안전 상태 미확인' in await status.inner_text()
         assert await page.locator('#triage-submit').is_enabled()
-        assert await page.locator('#ml-run').is_enabled()
-        count+=3
+        # The CSV inspector has no approved prediction model. A missing
+        # file must NOT leave an active 'run' button after the hazard clears.
+        assert await page.locator('#ml-run').is_disabled()
+        assert await page.locator('#ml-upload').is_enabled()
+        count+=4
         await page.locator('#triage-reset').click()
         assert await page.locator('#triage-hazard').input_value() == 'unknown'
         assert '안전 상태 미확인' in await status.inner_text()
