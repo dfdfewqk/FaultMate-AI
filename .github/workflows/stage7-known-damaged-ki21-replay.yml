@@ -8,6 +8,7 @@ on:
       - work/faultmate-stage7-ki21-condition-slices-20261106
       - work/faultmate-stage7-ki21-current-scaler-20261106
       - work/faultmate-stage7-current-dev-reference-20261106
+      - work/faultmate-stage7-dev-trial-spread-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
@@ -16,6 +17,7 @@ on:
       - work/faultmate-stage7-ki21-feature-attribution-20261106
       - work/faultmate-stage7-ki21-condition-slices-20261106
       - work/faultmate-stage7-ki21-current-scaler-20261106
+      - work/faultmate-stage7-current-dev-reference-20261106
 
 permissions:
   contents: read
@@ -503,8 +505,21 @@ jobs:
                 throw "False independent reference/specificity claim"
               }
               Write-Output ("KI21_VS_10_DEV_CONDITION condition={0} feature={1} ki21={2:N7} healthy_dev_median={3:N7} damaged_dev_median={4:N7} dev_min={5:N7} dev_max={6:N7} below_dev_range={7} above_dev_range={8} REUSED_DEV_DESCRIPTIVE_ONLY" -f $c.condition, $f.feature, [double]$f.ki21_condition_median_unitless, [double]$f.healthy_dev_condition_medians_median, [double]$f.damaged_dev_condition_medians_median, [double]$f.all_dev_condition_medians_min, [double]$f.all_dev_condition_medians_max, $f.ki21_below_all_dev_observed_range, $f.ki21_above_all_dev_observed_range)
+              $spread = $f.within_bearing_trial_dispersion
+              if ($spread.trials_not_independent_bearings -ne $true -or
+                  $spread.not_an_independent_repeat_extraction_test -ne $true -or
+                  $spread.not_a_calibrated_variance_or_sensor_stability_test -ne $true -or
+                  $spread.ki21_original_trials -ne 20 -or
+                  $spread.dev_bearings -ne 10 -or
+                  [double]$spread.ki21_trial_iqr_unitless -lt 0 -or
+                  [double]$spread.dev_ten_bearing_trial_iqr_min -lt 0 -or
+                  [double]$spread.dev_ten_bearing_trial_iqr_max -lt [double]$spread.dev_ten_bearing_trial_iqr_min) {
+                throw "Invalid per-bearing spread evidence or false independent test claim"
+              }
+              Write-Output ("KI21_DEV_REPEAT_TRIAL_IQR condition={0} feature={1} ki21={2:N7} healthy_dev_median={3:N7} damaged_dev_median={4:N7} dev_min={5:N7} dev_max={6:N7} outside_above={7} outside_below={8} NOT_INDEPENDENT_EXTRACTOR_REPLAY" -f $c.condition, $f.feature, [double]$spread.ki21_trial_iqr_unitless, [double]$spread.healthy_dev_five_bearing_trial_iqr_median, [double]$spread.damaged_dev_five_bearing_trial_iqr_median, [double]$spread.dev_ten_bearing_trial_iqr_min, [double]$spread.dev_ten_bearing_trial_iqr_max, $spread.ki21_trial_iqr_above_all_ten_dev_bearing_iqr, $spread.ki21_trial_iqr_below_all_ten_dev_bearing_iqr)
             }
           }
+          Write-Output "TEN_DEV_PHYSICAL_BEARING_REPEAT_TRIAL_SPREAD_DESCRIPTIVE_ONLY_PASS"
           Write-Output "KI21_VS_10_SHA_VERIFIED_DEV_BEARINGS_NOT_NEW_ACCURACY_NOT_MODEL_TUNING_PASS"
           Write-Output "KI21_CURRENT_TRAINING_SCALER_DESCRIPTIVE_ONLY_NOT_ANOMALY_OR_RUNTIME_APPROVAL"
           Write-Output "KI21_CONDITIONS_80_MAT_RECHECK_PASS_NOT_NEW_EVAL_NOT_VALIDATED_CONDITION_MODEL"
