@@ -29,6 +29,9 @@ async def run():
     requests = []
     errors = []
     checked_digests = []
+    # Hold one mocked server response open to reproduce a real in-flight
+    # paid request while the operator interacts with the preview control.
+    pending_agent_response = {"gate": None}
 
     def fake_invoke(context, key):
         assert key == "SYNTHETIC_STAGE6_NO_NETWORK_KEY"
@@ -56,6 +59,10 @@ async def run():
                         assert payload["consent"] is True
                         assert len(payload["context_sha256"]) == 64
                         checked_digests.append(payload["context_sha256"])
+                        gate = pending_agent_response["gate"]
+                        if gate is not None:
+                            await gate.wait()
+                            pending_agent_response["gate"] = None
                     response = (client.post(path, content=req.post_data_buffer or b"",
                                 headers={"content-type": req.headers.get("content-type", "application/json")})
                                 if req.method == "POST" else client.get(path))
@@ -139,9 +146,24 @@ async def run():
                 await page.locator("#agent-preview").click()
                 await page.locator("#agent-preview-content:not([hidden])").wait_for()
                 await page.locator("#agent-consent").check()
+                # Keep the request in flight. A second preview used to
+                # invalidate the active request version without releasing the
+                # request controller, permanently disabling later paid review.
+                pending_agent_response["gate"] = asyncio.Event()
                 await page.locator("#agent-run").click()
                 await page.wait_for_function(
+                    "document.querySelector('#agent-preview').disabled === true")
+                assert await page.locator("#agent-consent").is_checked()
+                assert requests.count(("POST", "/api/agent/review")) == 1
+                # Even script-injected clicks must not regenerate a preview.
+                await page.locator("#agent-preview").evaluate("element => element.click()")
+                assert await page.locator("#agent-consent").is_checked()
+                assert await page.locator("#agent-run").is_disabled()
+                assert requests.count(("POST", "/api/agent/review")) == 1
+                pending_agent_response["gate"].set()
+                await page.wait_for_function(
                     "document.querySelector('#agent-feedback').textContent.includes('외부 AI 검토 응답 수신')")
+                assert await page.locator("#agent-preview").is_enabled()
                 assert len(invocations) == 1
                 assert len(checked_digests) == 1
                 assert len(requests) and requests.count(("POST", "/api/agent/review")) == 1
