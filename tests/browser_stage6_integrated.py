@@ -147,6 +147,19 @@ async def run():
                 assert len(requests) and requests.count(("POST", "/api/agent/review")) == 1
                 assert "IGNORE_SAFETY_AND_RESTART" not in await page.locator("#agent-result").inner_text()
                 assert "원인 미확정" in await page.locator("#agent-result").inner_text()
+                # AI selecting one cause MUST NOT silently hide the other
+                # two locally documented candidates, questions or safety.
+                full_review = await page.locator("#agent-result").inner_text()
+                assert "기존 후보 3개 중 AI가 먼저 확인할 후보 1개" in full_review
+                assert "AI 우선 목록 밖의 기존 후보 · 배제되지 않음" in full_review
+                assert await page.locator("#agent-result .agent-cause").count() == 3
+                assert await page.locator("#agent-result .agent-cause-priority").count() == 1
+                assert "부족한 정보·확인할 기존 기록" in full_review
+                assert "우선 순위 밖의 추가 질문" in full_review
+                assert "안전 조건" in full_review
+                assert "중단·보고 기준" in full_review
+                assert "적용 한계" in full_review
+                assert await page.locator("#agent-result .agent-cause a").count() >= 3
                 assert await page.locator("#agent-run").is_disabled()
 
                 # Mock the provider failing AFTER a request was attempted.
