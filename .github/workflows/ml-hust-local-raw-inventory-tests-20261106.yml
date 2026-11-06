@@ -1,0 +1,28 @@
+name: FaultMate HUST local original file hash intake (offline only)
+on:
+  push:
+    branches:
+      - work/faultmate-ml-hust-original-metadata-discovery-20261106
+
+permissions:
+  contents: read
+
+jobs:
+  offline-original-intake:
+    name: Actual file SHA hashing protections using synthetic unit test bytes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing test/science requirements (no provider calls)
+        run: python -m pip install -r requirements-ml.txt pytest httpx
+      - name: Test local HUST bytes/SHA and previous original file provenance guards
+        run: |
+          python -m pytest -q tests/test_inventory_hust_original_local_files.py tests/test_verify_new_bearing_original_files.py
+          python -m compileall -q scripts/inventory_hust_original_local_files.py scripts/discover_hust_mendeley_original_metadata.py
+          python scripts/inventory_hust_original_local_files.py --help
