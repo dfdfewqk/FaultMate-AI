@@ -760,7 +760,10 @@
   });
   function syncAgentButton() {
     if (!agentRun || !agentConsent) return;
-    agentPreviewButton.disabled = triageHazard.value === 'yes';
+    // Keep the paid request's preview/consent hash stable until the
+    // in-flight server response settles. Re-previewing mid-flight can make
+    // the pending response stale and leave the UI locked indefinitely.
+    agentPreviewButton.disabled = triageHazard.value === 'yes' || !!agentRequestController;
     const previewValid = !!agentReviewedContextHash && lastPreviewVersion === agentPreviewVersion;
     agentRun.disabled = !triageCase.value || !triageOptions || demoMode || triageHazard.value === 'yes' ||
       !agentConsent.checked || !previewValid || !!agentRequestController;
@@ -810,6 +813,8 @@
   }
   agentConsent.addEventListener('change', syncAgentButton);
   agentPreviewButton.addEventListener('click', async () => {
+    // A programmatic click or stale UI event must also respect the lock.
+    if (agentRequestController) return;
     if (!triageOptions || !triageCase.value || triageHazard.value === 'yes' || demoMode) {
       agentFeedback.textContent = '실제 사례를 직접 선택하고 위험 상태를 확인해야 합니다. 가상 입력은 전송할 수 없습니다.';
       return;
