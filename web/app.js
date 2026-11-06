@@ -172,8 +172,8 @@
   });
   if (knowledgePanel.open) void ensureKnowledgeLoaded();
 
-  // P5 UI integration. All user/source text is inserted with textContent; no HTML injection.
-  // The frontend never calls an external server. Agent and ML remain Antigravity-owned.
+  // Current UI: render case/source text as text nodes, never dynamic markup.
+  // Browser talks to localhost only; paid AI is server-side, preview/consent gated.
   const triageForm = document.getElementById('triage-form');
   const triageEquipment = document.getElementById('triage-equipment');
   const triageCase = document.getElementById('triage-case');
