@@ -4,10 +4,12 @@ on:
     branches:
       - work/faultmate-stage7-known-damage-replay-20261106
       - work/faultmate-stage7-dev-miss-warning-20261106
+      - work/faultmate-stage7-ki21-feature-attribution-20261106
   pull_request:
     branches:
       - work/faultmate-stage7-direct-raw-rar-ml-20261105
       - work/faultmate-stage7-known-damage-replay-20261106
+      - work/faultmate-stage7-dev-miss-warning-20261106
 
 permissions:
   contents: read
@@ -329,6 +331,42 @@ jobs:
           python scripts/check_known_ki21_real_failure.py --archive $archive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Output "REAL_KI21_HISTORICAL_FALSE_NEGATIVE_REPRODUCED_PRODUCTION_MODEL_STILL_OFF"
+      - name: Attribute frozen KI21 logit from genuine original RAR, no refit
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "KI21.rar"
+          $report = Join-Path $env:RUNNER_TEMP "ki21_frozen_feature_attribution.json"
+          python -m scripts.explain_known_ki21_frozen_model --archive $archive > $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content $report -Raw | ConvertFrom-Json
+          if ($r.original_source_reauthenticated_this_run -ne $true -or
+              $r.source_mat_recordings -ne 80 -or
+              $r.bearing_id -ne "KI21" -or
+              $r.physical_truth_label -ne "damaged" -or
+              $r.prediction -ne "healthy" -or
+              $r.damage_model_score -ge 0.5 -or
+              $r.features_sorted_by_absolute_logit_contribution.Count -ne 12 -or
+              $r.new_independent_test -ne $false -or
+              $r.production_model_approved -ne $false -or
+              $r.safe_to_work -ne $false) {
+            throw "Actual KI21 attribution mismatched frozen source/model contract"
+          }
+          # Print only the frozen model's signed logit terms (not original
+          # waveforms, full feature vectors, new performance or causal claims).
+          # Individual contributions must sum with the intercept to the logit.
+          $terms = @($r.features_sorted_by_absolute_logit_contribution)
+          $sumTerms = ($terms | Measure-Object -Property signed_logit_contribution -Sum).Sum
+          $reconstructed = [double]$r.intercept + [double]$sumTerms
+          if ([math]::Abs($reconstructed - [double]$r.logit) -gt 0.00000001 -or
+              [math]::Abs([double]$r.damage_model_score - 0.45992558) -gt 0.00000002) {
+            throw "KI21 signed attribution terms do not explain the historical frozen prediction"
+          }
+          Write-Output ("KI21_FROZEN_ATTRIBUTION_INTERCEPT={0:N6} LOGIT={1:N6} SCORE={2:N8}" -f [double]$r.intercept, [double]$r.logit, [double]$r.damage_model_score)
+          foreach ($term in $terms) {
+            Write-Output ("KI21_FROZEN_FEATURE_CONTRIBUTION name={0} signed_logit={1:N6}" -f [string]$term.feature, [double]$term.signed_logit_contribution)
+          }
+          Write-Output "ATTRIBUTION_IS_FROZEN_MODEL_ARITHMETIC_NOT_PHYSICAL_CAUSE_NOT_NEW_EVALUATION"
+          Write-Output "REAL_KI21_ORIGINAL_80MAT_FROZEN_12_FEATURE_LOGIT_ATTRIBUTION_PASS_NO_NEW_TEST"
       - name: Original record safe and source/license untouched
         shell: pwsh
         run: |
