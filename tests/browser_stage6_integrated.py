@@ -72,6 +72,18 @@ async def run():
                 await page.add_script_tag(content=(root / "web/app.js").read_text(encoding="utf-8"))
                 await page.wait_for_function("document.querySelector('#triage-feedback').textContent.includes('설비와 사례')")
 
+                # Reproduce actual operator frustration: demo-mode AI may
+                # appear locked, but must explain why and NEVER charge.
+                await page.locator("#triage-demo").click()
+                await page.locator("#ai-quick-start").click()
+                assert "예시 입력" in await page.locator("#agent-next-step").inner_text()
+                assert await page.locator("#agent-run").is_disabled()
+                await page.locator("#agent-preview").click()
+                assert "가상 입력" in await page.locator("#agent-feedback").inner_text()
+                assert len(invocations) == 0
+                await page.locator("#triage-reset").click()
+                await page.locator("#integration-panel > summary").click()
+
                 await page.locator("#triage-equipment").select_option("컨베이어")
                 await page.locator("#triage-symptom").fill("STAGE6_PRIVATE_SYMPTOM")
                 await page.locator("#triage-case").select_option("CONV-001")
