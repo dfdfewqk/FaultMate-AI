@@ -1,0 +1,40 @@
+name: FaultMate HUST official dataset original index discovery (no source download)
+on:
+  push:
+    branches:
+      - work/faultmate-ml-hust-original-metadata-discovery-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-hust-source-index:
+    name: Official publisher HUST v3 metadata file listing (no model scoring)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read original publisher dataset v3 file listing, not raw signal data
+        run: |
+          python scripts/discover_hust_mendeley_original_metadata.py > "$RUNNER_TEMP/hust_v3_publisher_index.json"
+      - name: Show provenance-only file listings and safety status
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'hust_v3_publisher_index.json'
+          d=json.loads(p.read_text(encoding='utf-8'))
+          assert d['dataset_id']=='cbv7jyx4p9' and d['published_version']==3
+          assert d['actual_original_signal_bytes_downloaded'] is False
+          assert d['original_file_hashes_recomputed'] is False
+          assert d['specimen_identity_or_label_verified'] is False
+          assert d['production_ml_allowed'] is False
+          print('OFFICIAL_MENDELEY_SOURCE_INDEX_RETRIEVED',d['file_count_from_official_api'])
+          for f in d['files'][:30]:
+            print('PUBLISHER_FILE_METADATA', f['name'], f['size_bytes'],f['sha256_hash'])
+          PY
