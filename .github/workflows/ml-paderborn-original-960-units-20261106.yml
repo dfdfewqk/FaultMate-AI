@@ -1,0 +1,72 @@
+name: FaultMate Paderborn 960 original MAT channel Unit evidence (no SI guess)
+on:
+  push:
+    branches:
+      - work/faultmate-ml-paderborn-raw-si-mat-unit-audit-20261106
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  original-960-mat-unit-source:
+    name: All 12 old original source SHA audits and 960 original MAT stored Unit fields
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify unit-source SHA and no fake production calibration protections
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tests/test_audit_paderborn_960_original_mat_unit_metadata.py
+          python -m compileall -q scripts/audit_paderborn_960_original_mat_unit_metadata.py
+      - name: Get exact old 12 MAT source SHA and raw signal Unit audit reports (no new download)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41957475830
+          github-token: ${{ github.token }}
+          pattern: stage3-bearing-*
+          path: prior-mat-audits
+          merge-multiple: true
+      - name: Get original frozen 2026-11-05 960 MAT study with per-bearing audit SHA manifest
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41965647928
+          github-token: ${{ github.token }}
+          name: stage4-real-12-bearing-unitless-evaluation-unapproved
+          path: prior-study
+      - name: Actually require EXACT 960 original MAT Unit metadata from old pinned real source
+        run: |
+          python scripts/audit_paderborn_960_original_mat_unit_metadata.py \
+            --raw-audits prior-mat-audits \
+            --original-evaluation prior-study/real_unitless_evaluation.json \
+            --out "${{ runner.temp }}/paderborn_original_960_mat_si_unverified.json"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads((Path(os.environ['RUNNER_TEMP'])/'paderborn_original_960_mat_si_unverified.json').read_text())
+          assert d['source_recordings']==960
+          assert d['original_physical_bearings']==12
+          assert d['actual_prior_raw_audits_sha_verification'] is True
+          assert d['paper_proves_stored_mat_numeric_values_are_si'] is False
+          assert d['author_supplied_numeric_to_si_factors_offsets'] is False
+          assert d['si_csv_generated'] is False
+          assert d['model_retrained_or_activated'] is False
+          assert d['production_ml_activation_allowed'] is False
+          print('PADERBORN_REAL_960_ORIGINAL_CHANNEL_UNIT_FIELDS_SHA_VERIFIED')
+          print('UNVERIFIED_PAIR_COUNT',d['both_mat_units_unknown_count'])
+          print('SOURCE_UNITS_NOT_ASSUMED_NO_OWNED_MAT_OR_MODEL_CHANGED')
+          PY
+      - name: Preserve only SI Unit provenance tally, not 960 MAT raw signals
+        uses: actions/upload-artifact@v4
+        with:
+          name: paderborn-960-original-mat-raw-unit-evidence-unapproved
+          path: ${{ runner.temp }}/paderborn_original_960_mat_si_unverified.json
+          retention-days: 7
+          if-no-files-found: error
