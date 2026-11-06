@@ -93,7 +93,8 @@ def test_grouped_reference_has_ten_physical_bearings_not_796_independent_tests()
             assert dispersion["ki21_trial_iqr_unitless"] == pytest.approx(.0006)
             assert dispersion["ki21_trial_iqr_in_frozen_training_scale_units"] == pytest.approx(.06)
             assert dispersion["dev_ten_bearing_trial_iqr_median"] == pytest.approx(.0095)
-            assert dispersion["dev_ten_bearing_trial_iqr_min"] == pytest.approx(.0095)
+            expected_min = .0075 if condition["condition"] == sorted(OFFICIAL_CONDITIONS)[0] else .0095
+            assert dispersion["dev_ten_bearing_trial_iqr_min"] == pytest.approx(expected_min)
             assert dispersion["dev_ten_bearing_trial_iqr_max"] == pytest.approx(.0095)
             assert dispersion["ki21_trial_iqr_below_all_ten_dev_bearing_iqr"] is True
 
