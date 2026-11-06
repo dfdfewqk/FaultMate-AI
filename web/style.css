@@ -112,3 +112,12 @@ h1{font-size:clamp(27px,3vw,35px);margin:20px 0 10px}
 #agent-key-setup{margin:12px 0}#agent-key-setup summary{cursor:pointer;font-weight:700;font-size:12px;color:#365373}
 #agent-key-setup code{font-size:12px}#agent-controls{scroll-margin-top:22px}
 @media(max-width:650px){.operator-flow span{width:100%}.ai-entry button{width:100%}}
+
+
+/* Existing DeepSeek key metadata recheck: never a credential entry field. */
+.agent-key-check{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px;border:1px solid #cfdff2;border-radius:10px;background:#f4f8fd;margin:14px 0}
+.agent-key-check>div{min-width:220px;flex:1 1 320px}.agent-key-check b{display:block;color:#23496e;font-size:13px}
+.agent-key-check p{font-size:12px;line-height:1.6;color:#475f80;margin:7px 0 0}
+.agent-key-check button{font:inherit;font-size:12px;font-weight:700;color:#204e87;border:1px solid #b5c9e6;border-radius:9px;padding:11px 13px;background:#fff;cursor:pointer}
+.agent-key-check button:disabled{opacity:.65;cursor:progress}
+.agent-key-check button:focus-visible{outline:2px solid #3471cc;outline-offset:2px}
